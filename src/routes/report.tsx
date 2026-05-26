@@ -85,13 +85,9 @@ function ReportPage() {
     setPdfBusy(true);
     setForceOpen(true);
     
-    interface StyleBackup {
-      element: HTMLStyleElement | HTMLLinkElement;
-      type: "style" | "link";
-      originalText?: string;
-      tempStyle?: HTMLStyleElement;
-    }
-    const backups: StyleBackup[] = [];
+    const disabledSheets: CSSStyleSheet[] = [];
+    let tempStyle: HTMLStyleElement | null = null;
+    const restoreInline: Array<() => void> = [];
 
     try {
       // wait for re-render + expand animations
@@ -141,7 +137,6 @@ function ReportPage() {
 
       // 1. Sanitize inline styles in the LIVE DOM before html2canvas reads computed styles.
       const liveAll: HTMLElement[] = [el, ...Array.from(el.querySelectorAll<HTMLElement>("*"))];
-      const restoreInline: Array<() => void> = [];
       liveAll.forEach((node) => {
         const cs = window.getComputedStyle(node);
         const prevInline = node.getAttribute("style");
@@ -171,50 +166,36 @@ function ReportPage() {
         }
       });
 
-      // 2. Temporarily sanitize all global <style> tags
-      const styles = Array.from(document.querySelectorAll("style"));
-      styles.forEach((style) => {
-        const originalText = style.textContent ?? "";
-        if (/oklch/i.test(originalText)) {
-          const cleanedText = replaceOklch(originalText);
-          style.textContent = cleanedText;
-          backups.push({
-            element: style,
-            type: "style",
-            originalText,
-          });
-        }
-      });
-
-      // 3. Temporarily sanitize same-origin <link rel="stylesheet"> tags
-      const links = Array.from(document.querySelectorAll<HTMLLinkElement>("link[rel='stylesheet']"));
-      for (const link of links) {
+      // 2. Collect CSS from all same-origin stylesheets and disable them.
+      let combinedCss = "";
+      for (let i = 0; i < document.styleSheets.length; i++) {
+        const sheet = document.styleSheets[i];
         try {
-          if (link.href && link.href.startsWith(window.location.origin)) {
-            const res = await fetch(link.href);
-            if (res.ok) {
-              const originalText = await res.text();
-              if (/oklch/i.test(originalText)) {
-                const cleanedText = replaceOklch(originalText);
-                
-                const tempStyle = document.createElement("style");
-                tempStyle.textContent = cleanedText;
-                document.head.appendChild(tempStyle);
-                
-                link.disabled = true;
-                
-                backups.push({
-                  element: link,
-                  type: "link",
-                  tempStyle,
-                });
+          if (!sheet.disabled) {
+            if (sheet.cssRules) {
+              let rulesText = "";
+              for (let j = 0; j < sheet.cssRules.length; j++) {
+                rulesText += sheet.cssRules[j].cssText + "\n";
               }
+              combinedCss += rulesText;
             }
+            sheet.disabled = true;
+            disabledSheets.push(sheet);
           }
         } catch (e) {
-          console.warn("Could not sanitize link stylesheet:", link.href, e);
+          try {
+            sheet.disabled = true;
+            disabledSheets.push(sheet);
+          } catch {
+            // ignore
+          }
         }
       }
+
+      // 3. Create temporary <style> element with sanitized CSS
+      tempStyle = document.createElement("style");
+      tempStyle.textContent = replaceOklch(combinedCss);
+      document.head.appendChild(tempStyle);
 
       let canvas: HTMLCanvasElement;
       try {
@@ -224,17 +205,16 @@ function ReportPage() {
           useCORS: true,
           windowWidth: el.scrollWidth,
         });
-      } // restore style changes immediately in finally
-      finally {
+      } finally {
+        if (tempStyle) {
+          tempStyle.remove();
+          tempStyle = null;
+        }
         restoreInline.forEach((fn) => fn());
-        backups.forEach((b) => {
-          if (b.type === "style" && b.originalText !== undefined) {
-            b.element.textContent = b.originalText;
-          } else if (b.type === "link" && b.tempStyle) {
-            b.tempStyle.remove();
-            (b.element as HTMLLinkElement).disabled = false;
-          }
+        disabledSheets.forEach((sheet) => {
+          sheet.disabled = false;
         });
+        disabledSheets.length = 0;
       }
 
       const pdf = new JsPDF({ orientation: "p", unit: "mm", format: "a4" });
@@ -276,13 +256,12 @@ function ReportPage() {
       console.error("PDF export failed", e);
       alert("PDF export failed: " + ((e as Error)?.message ?? String(e)));
     } finally {
-      backups.forEach((b) => {
-        if (b.type === "style" && b.originalText !== undefined) {
-          b.element.textContent = b.originalText;
-        } else if (b.type === "link" && b.tempStyle) {
-          b.tempStyle.remove();
-          (b.element as HTMLLinkElement).disabled = false;
-        }
+      if (tempStyle) {
+        tempStyle.remove();
+      }
+      restoreInline.forEach((fn) => fn());
+      disabledSheets.forEach((sheet) => {
+        sheet.disabled = false;
       });
       setForceOpen(false);
       setPdfBusy(false);
