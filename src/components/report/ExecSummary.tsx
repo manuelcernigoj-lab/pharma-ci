@@ -8,7 +8,7 @@ export function ExecSummary({ data }: { data: ReportData }) {
   const metrics = [
     { label: t("active_trials"), value: data.pipeline?.total_active_trials ?? data.pipeline?.trials?.length ?? 0 },
     { label: t("approved_drugs"), value: data.approved_drugs?.length ?? 0 },
-    { label: t("publications"), value: data.top_publications?.length ?? 0 },
+    { label: t("publications"), value: data.stats?.publications ?? data.top_publications?.length ?? 0 },
     { label: t("top_threat"), value: top?.drug ?? "—" },
   ];
   return (

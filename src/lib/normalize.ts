@@ -116,5 +116,6 @@ export function normalizeReport(input: unknown): ReportData | null {
     top_publications: pubs,
     validation: root.validation,
     chart_data: root.chart_data,
+    stats: root.stats,
   };
 }

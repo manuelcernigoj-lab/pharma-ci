@@ -84,6 +84,15 @@ function ReportPage() {
     if (!mainRef.current) return;
     setPdfBusy(true);
     setForceOpen(true);
+    
+    interface StyleBackup {
+      element: HTMLStyleElement | HTMLLinkElement;
+      type: "style" | "link";
+      originalText?: string;
+      tempStyle?: HTMLStyleElement;
+    }
+    const backups: StyleBackup[] = [];
+
     try {
       // wait for re-render + expand animations
       await new Promise((r) => setTimeout(r, 600));
@@ -93,19 +102,35 @@ function ReportPage() {
       ]);
       const el = mainRef.current;
 
-      // Convert any modern CSS color (oklch/oklab/lch/lab/color()) to rgb via canvas.
       const probe = document.createElement("canvas").getContext("2d")!;
       const toRgb = (v: string): string => {
         if (!v) return v;
         if (!/oklch|oklab|color\(|lch\(|lab\(/i.test(v)) return v;
         try {
-          probe.fillStyle = "#000";
+          probe.fillStyle = "#ffffff";
           probe.fillStyle = v;
-          return probe.fillStyle as string;
+          const res1 = probe.fillStyle;
+
+          probe.fillStyle = "#000000";
+          probe.fillStyle = v;
+          const res2 = probe.fillStyle;
+
+          if (res1 === res2) {
+            return res1;
+          }
+          return v;
         } catch {
           return v;
         }
       };
+
+      const replaceOklch = (text: string): string => {
+        return text.replace(/oklch\([^)]+\)/gi, (match) => {
+          const resolved = toRgb(match);
+          return resolved;
+        });
+      };
+
       const colorProps = [
         "color", "background-color",
         "border-top-color", "border-right-color",
@@ -114,9 +139,9 @@ function ReportPage() {
         "text-decoration-color", "caret-color",
       ];
 
-      // Sanitize the LIVE DOM before html2canvas reads computed styles.
+      // 1. Sanitize inline styles in the LIVE DOM before html2canvas reads computed styles.
       const liveAll: HTMLElement[] = [el, ...Array.from(el.querySelectorAll<HTMLElement>("*"))];
-      const restore: Array<() => void> = [];
+      const restoreInline: Array<() => void> = [];
       liveAll.forEach((node) => {
         const cs = window.getComputedStyle(node);
         const prevInline = node.getAttribute("style");
@@ -139,12 +164,57 @@ function ReportPage() {
           changed = true;
         }
         if (changed) {
-          restore.push(() => {
+          restoreInline.push(() => {
             if (prevInline === null) node.removeAttribute("style");
             else node.setAttribute("style", prevInline);
           });
         }
       });
+
+      // 2. Temporarily sanitize all global <style> tags
+      const styles = Array.from(document.querySelectorAll("style"));
+      styles.forEach((style) => {
+        const originalText = style.textContent ?? "";
+        if (/oklch/i.test(originalText)) {
+          const cleanedText = replaceOklch(originalText);
+          style.textContent = cleanedText;
+          backups.push({
+            element: style,
+            type: "style",
+            originalText,
+          });
+        }
+      });
+
+      // 3. Temporarily sanitize same-origin <link rel="stylesheet"> tags
+      const links = Array.from(document.querySelectorAll<HTMLLinkElement>("link[rel='stylesheet']"));
+      for (const link of links) {
+        try {
+          if (link.href && link.href.startsWith(window.location.origin)) {
+            const res = await fetch(link.href);
+            if (res.ok) {
+              const originalText = await res.text();
+              if (/oklch/i.test(originalText)) {
+                const cleanedText = replaceOklch(originalText);
+                
+                const tempStyle = document.createElement("style");
+                tempStyle.textContent = cleanedText;
+                document.head.appendChild(tempStyle);
+                
+                link.disabled = true;
+                
+                backups.push({
+                  element: link,
+                  type: "link",
+                  tempStyle,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Could not sanitize link stylesheet:", link.href, e);
+        }
+      }
 
       let canvas: HTMLCanvasElement;
       try {
@@ -154,8 +224,17 @@ function ReportPage() {
           useCORS: true,
           windowWidth: el.scrollWidth,
         });
-      } finally {
-        restore.forEach((fn) => fn());
+      } // restore style changes immediately in finally
+      finally {
+        restoreInline.forEach((fn) => fn());
+        backups.forEach((b) => {
+          if (b.type === "style" && b.originalText !== undefined) {
+            b.element.textContent = b.originalText;
+          } else if (b.type === "link" && b.tempStyle) {
+            b.tempStyle.remove();
+            (b.element as HTMLLinkElement).disabled = false;
+          }
+        });
       }
 
       const pdf = new JsPDF({ orientation: "p", unit: "mm", format: "a4" });
@@ -163,7 +242,6 @@ function ReportPage() {
       const pageH = pdf.internal.pageSize.getHeight();
       const imgW = pageW;
 
-      // Slice canvas into page-sized chunks so each PDF page is independent.
       const pxPerMm = canvas.width / pageW;
       const pageHpx = Math.floor(pageH * pxPerMm);
       let renderedPx = 0;
@@ -185,7 +263,6 @@ function ReportPage() {
         renderedPx += sliceH;
       }
 
-      // Force a download via blob + anchor (robust across browsers).
       const blob = pdf.output("blob");
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -199,11 +276,18 @@ function ReportPage() {
       console.error("PDF export failed", e);
       alert("PDF export failed: " + ((e as Error)?.message ?? String(e)));
     } finally {
+      backups.forEach((b) => {
+        if (b.type === "style" && b.originalText !== undefined) {
+          b.element.textContent = b.originalText;
+        } else if (b.type === "link" && b.tempStyle) {
+          b.tempStyle.remove();
+          (b.element as HTMLLinkElement).disabled = false;
+        }
+      });
       setForceOpen(false);
       setPdfBusy(false);
       setExportOpen(false);
     }
-
   };
 
   const handleRunValidation = async () => {

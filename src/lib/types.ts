@@ -97,4 +97,8 @@ export interface ReportData {
       italy_start?: number; italy_end?: number;
     }>;
   };
+  stats?: {
+    publications?: number;
+  };
 }
+

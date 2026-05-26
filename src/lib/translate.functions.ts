@@ -6,15 +6,36 @@ export const translateStrings = createServerFn({ method: "POST" })
     const { texts, target } = data;
     if (!texts.length) return { translations: [] as string[] };
 
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    const lovableApiKey = process.env.LOVABLE_API_KEY;
+
+    let url = "";
+    let apiKey = "";
+    let model = "";
+
+    if (geminiApiKey) {
+      url = "https://generativelanguage.googleapis.com/v1beta/chat/completions";
+      apiKey = geminiApiKey;
+      model = "gemini-2.5-flash";
+    } else if (openaiApiKey) {
+      url = "https://api.openai.com/v1/chat/completions";
+      apiKey = openaiApiKey;
+      model = "gpt-4o-mini";
+    } else if (lovableApiKey) {
+      url = "https://ai.gateway.lovable.dev/v1/chat/completions";
+      apiKey = lovableApiKey;
+      model = "google/gemini-2.5-flash";
+    } else {
+      throw new Error("No translation API key configured. Please set GEMINI_API_KEY or OPENAI_API_KEY in your environment variables.");
+    }
 
     const targetName = target === "it" ? "Italian" : "English";
     const sys = `You are a professional medical/pharmaceutical translator. Translate each input string to ${targetName}. Preserve drug names, gene names, NCT IDs, numbers, dates, percentages, and acronyms exactly as written. Maintain a professional clinical tone. Return ONLY a JSON object: {"translations": [..]} with the same number of strings, in the same order. Do not add any extra fields or commentary.`;
 
     const user = JSON.stringify({ texts });
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
