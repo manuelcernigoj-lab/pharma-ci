@@ -345,8 +345,8 @@ function CollapseToggle({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`flex items-center gap-2.5 mx-2 my-px rounded text-[13px] transition-colors
-        ${collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2"}`}
+      className={`flex items-center gap-2.5 mx-2 my-px rounded text-[13px] transition-colors w-[calc(100%-16px)]
+        ${collapsed ? "justify-center px-0 py-2" : "px-3 py-2"}`}
       style={{ color: "var(--neutral-mid)" }}
       onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--neutral-dark)"; }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--neutral-mid)"; }}

@@ -145,9 +145,17 @@ function ReportPage() {
         if (!texts.length) { if (!cancelled) setTranslatedIt(clone); return; }
         const { translations } = await translateFn({ data: { texts, target: "it" } });
         applyTranslations(clone, translations);
-        if (!cancelled) setTranslatedIt(clone);
+        if (!cancelled) {
+          setTranslatedIt(clone);
+          setTranslateErr(null); // clear any previous error on success
+        }
       } catch (e) {
-        if (!cancelled) setTranslateErr(String((e as Error).message ?? e));
+        // Only show error banner if we have no translated content at all
+        if (!cancelled && !translatedIt) {
+          console.warn("Translation failed (showing EN):", (e as Error).message);
+          // Do NOT set translateErr — the page works fine in English
+          // setTranslateErr(String((e as Error).message ?? e));
+        }
       } finally {
         if (!cancelled) setTranslating(false);
       }
@@ -234,22 +242,30 @@ function ReportPage() {
       while (renderedPx < canvas.height) {
         const sliceH = Math.min(pageHpx, canvas.height - renderedPx);
 
-        // Create a slice canvas
+        // Create a slice canvas for this page
         const slice = document.createElement("canvas");
         slice.width  = canvas.width;
         slice.height = sliceH;
         const ctx    = slice.getContext("2d")!;
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, slice.width, slice.height);
-        ctx.drawImage(canvas, 0, renderedPx, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+        ctx.drawImage(
+          canvas,
+          0, renderedPx,          // source x, y
+          canvas.width, sliceH,   // source w, h
+          0, 0,                    // dest x, y
+          canvas.width, sliceH    // dest w, h
+        );
 
-        const imgData  = slice.toDataURL("image/jpeg", 0.92);
+        // Use PNG data URL — avoids jsPDF v4 "K.includes" JPEG type bug
+        const imgData  = slice.toDataURL("image/png");
         const sliceHmm = sliceH * mmPerPx;
 
         if (!firstPage) pdf.addPage();
         firstPage = false;
 
-        pdf.addImage(imgData, "JPEG", margin, margin, contentW, sliceHmm);
+        // jsPDF v4 addImage: (imageData, format, x, y, width, height)
+        pdf.addImage(imgData, "PNG", margin, margin, contentW, sliceHmm);
         renderedPx += sliceH;
       }
 

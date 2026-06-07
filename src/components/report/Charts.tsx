@@ -7,9 +7,10 @@ import { useState } from "react";
 import type { ReportData } from "@/lib/types";
 
 /* ── Palette tokens (matching CSS vars) ─────────────────────── */
-const C_ACCENT   = "#d97757";   // terracotta — primary / high threat
-const C_CONTRAST = "#6a9bcc";   // steel blue — secondary / medium
-const C_DARK     = "#141413";   // near-black — neutral / low
+const C_ACCENT   = "#d97757";   // terracotta — primary / high threat / publications
+const C_MED      = "#474747";   // dark grey  — medium threat
+const C_LOW      = "#797979";   // mid grey   — low threat
+const C_DARK     = "#141413";   // near-black — structural
 const C_MID      = "#b0aea5";   // warm grey  — grid, axis
 const C_BG       = "#faf9f5";   // canvas
 
@@ -49,9 +50,9 @@ function fillMonths(rows: PubRow[]): PubRow[] {
 
 function colorFor(c?: string): string {
   if (!c) return C_ACCENT;
-  if (c === "red")    return C_ACCENT;
-  if (c === "yellow") return C_CONTRAST;
-  if (c === "green")  return C_DARK;
+  if (c === "red")    return C_ACCENT;   // high threat  → terracotta
+  if (c === "yellow") return C_MED;      // medium threat → dark grey
+  if (c === "green")  return C_LOW;      // low threat    → mid grey
   return c;
 }
 
@@ -190,7 +191,7 @@ export function Charts({ data }: { data: ReportData }) {
                 cursor={{ fill: "rgba(217,119,87,0.08)" }}
                 contentStyle={{ border: "1px solid var(--border-color)", borderRadius: 4, fontSize: 12 }}
               />
-              <Bar dataKey="publications" fill={C_CONTRAST} radius={[3, 3, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="publications" fill={C_ACCENT} radius={[3, 3, 0, 0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -264,9 +265,9 @@ export function Charts({ data }: { data: ReportData }) {
             </div>
             <ul className="space-y-2">
               {[
-                { color: C_ACCENT,   label: t("threat_high"), desc: t("threat_high_desc") },
-                { color: C_CONTRAST, label: t("threat_med"),  desc: t("threat_med_desc")  },
-                { color: C_DARK,     label: t("threat_low"),  desc: t("threat_low_desc")  },
+                { color: C_ACCENT, label: t("threat_high"), desc: t("threat_high_desc") },
+                { color: C_MED,    label: t("threat_med"),  desc: t("threat_med_desc")  },
+                { color: C_LOW,    label: t("threat_low"),  desc: t("threat_low_desc")  },
               ].map((item) => (
                 <li key={item.label} className="flex items-start gap-2">
                   <span
@@ -351,7 +352,7 @@ export function Charts({ data }: { data: ReportData }) {
                     color:      region === r ? "#ffffff" : "var(--neutral-mid)",
                   }}
                 >
-                  {r === "italy" ? "Italia" : r.toUpperCase()}
+                  {r === "italy" ? "IT" : r.toUpperCase()}
                 </button>
               ))}
             </div>
