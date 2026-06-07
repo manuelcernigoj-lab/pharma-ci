@@ -11,7 +11,6 @@ import {
   PipelineSection, ApprovedSection, ThreatSection, TtmSection,
   InnovSection, EndpointSection, PublicationsSection, ValidationSection,
 } from "@/components/report/Sections";
-
 import { Loader2 } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { translateStrings } from "@/lib/translate.functions";
@@ -21,34 +20,121 @@ import { ForceOpenContext } from "@/components/report/force-open";
 
 export const Route = createFileRoute("/report")({ component: ReportPage });
 
+/* ── PDF palette (resolved hex — no oklch) ───────────────────── */
+const PDF_STYLES = `
+  :root {
+    --accent-primary: #d97757;
+    --neutral-dark: #141413;
+    --neutral-mid: #b0aea5;
+    --neutral-muted: #d6d4cf;
+    --bg: #faf9f5;
+    --surface: #ffffff;
+    --border-color: #e2e0db;
+    --background: #faf9f5;
+    --foreground: #141413;
+    --primary: #d97757;
+    --primary-foreground: #ffffff;
+    --muted-foreground: #b0aea5;
+    --border: #e2e0db;
+    --card: #ffffff;
+    --success: #5a9e6f;
+    --warning: #c8922a;
+  }
+
+  /* ── Layout: single column, no sidebar gap ──────────────────── */
+  body {
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif !important;
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+    color: #141413 !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* hide everything outside the report */
+  .no-print { display: none !important; }
+
+  /* remove sidebar margin — the cloned node is the main element itself */
+  [data-report-root] {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ── Cards & sections ───────────────────────────────────────── */
+  section, [class*="rounded"] {
+    border-radius: 4px !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* ── Typography scale-down ──────────────────────────────────── */
+  h1, h2 { font-size: 14px !important; }
+  h3, h4 { font-size: 12px !important; }
+  p, td, th, li, span { font-size: 11px !important; }
+
+  /* exec summary big number */
+  .exec-metric-value { font-size: 20px !important; }
+
+  /* ── Tables: no page split mid-row ──────────────────────────── */
+  table { border-collapse: collapse !important; width: 100% !important; }
+  tr    { page-break-inside: avoid !important; }
+  th, td {
+    padding: 4px 6px !important;
+    font-size: 10px !important;
+    border-bottom: 1px solid #e2e0db !important;
+    word-break: break-word !important;
+    max-width: 180px !important;
+  }
+
+  /* ── Collapsibles: force open in PDF ───────────────────────── */
+  .collapsible-content {
+    display: block !important;
+    max-height: none !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    grid-template-rows: 1fr !important;
+  }
+
+  /* ── Charts: contain height ─────────────────────────────────── */
+  .recharts-responsive-container { height: 220px !important; }
+
+  /* ── Grid: single column on narrow PDF ─────────────────────── */
+  .grid { display: block !important; }
+  .grid > * { margin-bottom: 8px !important; width: 100% !important; }
+`;
+
 function ReportPage() {
   const { lang } = useI18n();
-  const navigate = useNavigate();
-  const [original, setOriginal] = useState<ReportData | null>(null);
-  const [translatedIt, setTranslatedIt] = useState<ReportData | null>(null);
-  const [translating, setTranslating] = useState(false);
-  const [translateErr, setTranslateErr] = useState<string | null>(null);
-  const [validating, setValidating] = useState(false);
+  const navigate  = useNavigate();
+
+  const [original,      setOriginal]      = useState<ReportData | null>(null);
+  const [translatedIt,  setTranslatedIt]  = useState<ReportData | null>(null);
+  const [translating,   setTranslating]   = useState(false);
+  const [translateErr,  setTranslateErr]  = useState<string | null>(null);
+  const [validating,    setValidating]    = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [pdfBusy, setPdfBusy] = useState(false);
-  const [forceOpen, setForceOpen] = useState(false);
+  const [exportOpen,    setExportOpen]    = useState(false);
+  const [pdfBusy,       setPdfBusy]       = useState(false);
+  const [forceOpen,     setForceOpen]     = useState(false);
+
   const chartsRef = useRef<HTMLDivElement>(null);
-  const mainRef = useRef<HTMLElement>(null);
+  const mainRef   = useRef<HTMLElement>(null);
   const translateFn = useServerFn(translateStrings);
 
+  /* ── Load report from store ────────────────────────────────── */
   useEffect(() => {
     const d = reportStore.get();
     if (!d) navigate({ to: "/" });
     else setOriginal(d);
-    // intentionally run once on mount — navigate identity changes must not retrigger
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ── IT translation ────────────────────────────────────────── */
   useEffect(() => {
-    if (!original) return;
-    if (lang !== "it") return;
-    if (translatedIt) return;
+    if (!original || lang !== "it" || translatedIt) return;
     let cancelled = false;
     (async () => {
       setTranslating(true);
@@ -56,219 +142,139 @@ function ReportPage() {
       try {
         const clone = deepClone(original);
         const { texts } = collectTranslatable(clone);
-        if (texts.length === 0) {
-          if (!cancelled) setTranslatedIt(clone);
-          return;
-        }
+        if (!texts.length) { if (!cancelled) setTranslatedIt(clone); return; }
         const { translations } = await translateFn({ data: { texts, target: "it" } });
         applyTranslations(clone, translations);
         if (!cancelled) setTranslatedIt(clone);
       } catch (e) {
-        console.error(e);
         if (!cancelled) setTranslateErr(String((e as Error).message ?? e));
       } finally {
         if (!cancelled) setTranslating(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [lang, original, translatedIt, translateFn]);
 
   if (!original) return null;
 
-  const data: ReportData =
-    lang === "it" ? (translatedIt ?? original) : original;
+  const data: ReportData = lang === "it" ? (translatedIt ?? original) : original;
 
+  /* ── PDF Export ────────────────────────────────────────────── */
   const handleDownloadPdf = async () => {
     if (!mainRef.current) return;
     setPdfBusy(true);
     setForceOpen(true);
-    
-    const disabledSheets: CSSStyleSheet[] = [];
-    let tempStyle: HTMLStyleElement | null = null;
-    const restoreInline: Array<() => void> = [];
+
+    // Give React time to expand all collapsibles
+    await new Promise((r) => setTimeout(r, 700));
 
     try {
-      // wait for re-render + expand animations
-      await new Promise((r) => setTimeout(r, 600));
       const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
         import("html2canvas"),
         import("jspdf"),
       ]);
+
       const el = mainRef.current;
 
-      const probe = document.createElement("canvas").getContext("2d")!;
-      const toRgb = (v: string): string => {
-        if (!v) return v;
-        if (!/oklch|oklab|color\(|lch\(|lab\(/i.test(v)) return v;
-        try {
-          probe.fillStyle = "#ffffff";
-          probe.fillStyle = v;
-          const res1 = probe.fillStyle;
+      /* 1. Inject PDF-specific stylesheet into the document */
+      const styleTag = document.createElement("style");
+      styleTag.id    = "__pharmaci-pdf-style__";
+      styleTag.textContent = PDF_STYLES;
+      document.head.appendChild(styleTag);
 
-          probe.fillStyle = "#000000";
-          probe.fillStyle = v;
-          const res2 = probe.fillStyle;
-
-          if (res1 === res2) {
-            return res1;
-          }
-          return v;
-        } catch {
-          return v;
-        }
-      };
-
-      const replaceOklch = (text: string): string => {
-        return text.replace(/oklch\([^)]+\)/gi, (match) => {
-          const resolved = toRgb(match);
-          return resolved;
-        });
-      };
-
-      const colorProps = [
-        "color", "background-color",
-        "border-top-color", "border-right-color",
-        "border-bottom-color", "border-left-color",
-        "outline-color", "fill", "stroke",
-        "text-decoration-color", "caret-color",
-      ];
-
-      // 1. Sanitize inline styles in the LIVE DOM before html2canvas reads computed styles.
-      const liveAll: HTMLElement[] = [el, ...Array.from(el.querySelectorAll<HTMLElement>("*"))];
-      liveAll.forEach((node) => {
-        const cs = window.getComputedStyle(node);
-        const prevInline = node.getAttribute("style");
-        let changed = false;
-        colorProps.forEach((p) => {
-          const cur = cs.getPropertyValue(p);
-          const fixed = toRgb(cur);
-          if (fixed && fixed !== cur) {
-            node.style.setProperty(p, fixed, "important");
-            changed = true;
-          }
-        });
-        const bgImg = cs.getPropertyValue("background-image");
-        if (bgImg && /oklch|oklab|lch\(|lab\(|color\(/i.test(bgImg)) {
-          const replaced = bgImg.replace(
-            /(oklch|oklab|lch|lab|color)\([^)]*\)/gi,
-            (m) => toRgb(m)
-          );
-          node.style.setProperty("background-image", replaced, "important");
-          changed = true;
-        }
-        if (changed) {
-          restoreInline.push(() => {
-            if (prevInline === null) node.removeAttribute("style");
-            else node.setAttribute("style", prevInline);
-          });
-        }
-      });
-
-      // 2. Collect CSS from all same-origin stylesheets and disable them.
-      let combinedCss = "";
-      for (let i = 0; i < document.styleSheets.length; i++) {
-        const sheet = document.styleSheets[i];
-        try {
-          if (!sheet.disabled) {
-            if (sheet.cssRules) {
-              let rulesText = "";
-              for (let j = 0; j < sheet.cssRules.length; j++) {
-                rulesText += sheet.cssRules[j].cssText + "\n";
-              }
-              combinedCss += rulesText;
-            }
-            sheet.disabled = true;
-            disabledSheets.push(sheet);
-          }
-        } catch (e) {
-          try {
-            sheet.disabled = true;
-            disabledSheets.push(sheet);
-          } catch {
-            // ignore
-          }
-        }
-      }
-
-      // 3. Create temporary <style> element with sanitized CSS
-      tempStyle = document.createElement("style");
-      tempStyle.textContent = replaceOklch(combinedCss);
-      document.head.appendChild(tempStyle);
-
+      /* 2. Snapshot with html2canvas
+           – scale: 1.5 → good balance of sharpness vs file size
+           – windowWidth: A4 in px at 96dpi (794px) for proper text wrapping
+           – ignoreElements: skip sidebar, header, modals                      */
       let canvas: HTMLCanvasElement;
       try {
         canvas = await html2canvas(el, {
-          scale: 2,
-          backgroundColor: "#f4fffb",
+          scale: 1.5,
+          backgroundColor: "#ffffff",
           useCORS: true,
-          windowWidth: el.scrollWidth,
+          windowWidth: 794,           // A4 width at 96dpi
+          windowHeight: el.scrollHeight,
+          ignoreElements: (node) => {
+            const cls = (node as HTMLElement).className ?? "";
+            const tag = (node as HTMLElement).tagName ?? "";
+            return (
+              cls.includes("no-print") ||
+              tag === "ASIDE" ||
+              tag === "HEADER" ||
+              cls.includes("ExportModal") ||
+              (node as HTMLElement).getAttribute?.("role") === "dialog"
+            );
+          },
         });
       } finally {
-        if (tempStyle) {
-          tempStyle.remove();
-          tempStyle = null;
-        }
-        restoreInline.forEach((fn) => fn());
-        disabledSheets.forEach((sheet) => {
-          sheet.disabled = false;
-        });
-        disabledSheets.length = 0;
+        /* 3. Always remove the injected style */
+        styleTag.remove();
       }
 
-      const pdf = new JsPDF({ orientation: "p", unit: "mm", format: "a4" });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const imgW = pageW;
+      /* 4. Build paginated PDF
+           – A4 portrait: 210 × 297 mm
+           – 10mm margins on all sides
+           – content width: 190mm                                              */
+      const pdf      = new JsPDF({ orientation: "p", unit: "mm", format: "a4" });
+      const pageW    = 210;
+      const pageH    = 297;
+      const margin   = 10;
+      const contentW = pageW - margin * 2;   // 190mm
 
-      const pxPerMm = canvas.width / pageW;
-      const pageHpx = Math.floor(pageH * pxPerMm);
+      // Canvas → content dimensions in mm
+      const mmPerPx  = contentW / canvas.width;
+      const contentH = canvas.height * mmPerPx;  // total height in mm
+
+      // Slice height in px that fits one page
+      const pageHpx  = Math.floor((pageH - margin * 2) / mmPerPx);
+
       let renderedPx = 0;
-      let first = true;
+      let firstPage  = true;
+
       while (renderedPx < canvas.height) {
         const sliceH = Math.min(pageHpx, canvas.height - renderedPx);
+
+        // Create a slice canvas
         const slice = document.createElement("canvas");
-        slice.width = canvas.width;
+        slice.width  = canvas.width;
         slice.height = sliceH;
-        const ctx = slice.getContext("2d")!;
-        ctx.fillStyle = "#f4fffb";
+        const ctx    = slice.getContext("2d")!;
+        ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, slice.width, slice.height);
         ctx.drawImage(canvas, 0, renderedPx, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-        const data = slice.toDataURL("image/jpeg", 0.92);
-        if (!first) pdf.addPage();
-        first = false;
-        const sliceHmm = (sliceH / canvas.width) * imgW;
-        pdf.addImage(data, "JPEG", 0, 0, imgW, sliceHmm);
+
+        const imgData  = slice.toDataURL("image/jpeg", 0.92);
+        const sliceHmm = sliceH * mmPerPx;
+
+        if (!firstPage) pdf.addPage();
+        firstPage = false;
+
+        pdf.addImage(imgData, "JPEG", margin, margin, contentW, sliceHmm);
         renderedPx += sliceH;
       }
 
+      /* 5. Download */
       const blob = pdf.output("blob");
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
       a.download = "pharmaci-report.pdf";
       document.body.appendChild(a);
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
+
     } catch (e) {
       console.error("PDF export failed", e);
       alert("PDF export failed: " + ((e as Error)?.message ?? String(e)));
     } finally {
-      if (tempStyle) {
-        tempStyle.remove();
-      }
-      restoreInline.forEach((fn) => fn());
-      disabledSheets.forEach((sheet) => {
-        sheet.disabled = false;
-      });
       setForceOpen(false);
       setPdfBusy(false);
       setExportOpen(false);
     }
   };
 
+  /* ── Validation ────────────────────────────────────────────── */
   const handleRunValidation = async () => {
     if (!original) return;
     setValidating(true);
@@ -285,13 +291,11 @@ function ReportPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       const validation = json?.validation ?? json?.report?.validation ?? json;
-      setOriginal((prev) => (prev ? { ...prev, validation } : prev));
-      setTranslatedIt((prev) => (prev ? { ...prev, validation } : prev));
+      setOriginal((prev) => prev ? { ...prev, validation } : prev);
+      setTranslatedIt((prev) => prev ? { ...prev, validation } : prev);
     } catch (e) {
       console.error(e);
-      setValidationError(
-        lang === "it" ? "Validazione non riuscita. Riprova." : "Validation failed. Try again."
-      );
+      setValidationError(lang === "it" ? "Validazione non riuscita. Riprova." : "Validation failed. Try again.");
     } finally {
       clearTimeout(timer);
       setValidating(false);
@@ -300,8 +304,9 @@ function ReportPage() {
 
   const validationPassed = !!data.validation?.validation_passed;
 
+  /* ── Render ────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen" style={{ background: "#f4fffb" }}>
+    <div className="min-h-screen" style={{ background: "#faf9f5" }}>
       <Sidebar
         page="report"
         validation={data.validation ?? null}
@@ -319,68 +324,89 @@ function ReportPage() {
         pdfBusy={pdfBusy}
       />
 
-      <div className="md:ml-[var(--sidebar-w,240px)] transition-[margin] duration-300 ease-out">
+      {/* Content area — respects sidebar width via CSS var */}
+      <div
+        className="md:ml-[var(--sidebar-w,224px)] transition-[margin] duration-300 ease-out"
+      >
+        {/* Slim top bar */}
         <header
-          className="sticky top-0 z-20 bg-white border-b no-print"
-          style={{ height: 52, borderColor: "rgba(78,194,167,0.15)" }}
+          className="sticky top-0 z-20 bg-white no-print"
+          style={{ height: 48, borderBottom: "1px solid var(--border-color)" }}
         >
-          <div className="h-full max-w-6xl mx-auto px-4 flex items-center gap-2 pl-14 md:pl-4">
-            <img src={logo} alt="" className="h-6 w-6 rounded" />
-            <span className="font-bold text-[17px]" style={{ color: "#1f7f6e" }}>PharmaCI</span>
+          <div className="h-full max-w-5xl mx-auto px-4 flex items-center gap-2 pl-14 md:pl-4">
+            <img src={logo} alt="" className="h-5 w-5 rounded" />
+            <span className="font-bold text-[15px]" style={{ color: "var(--neutral-dark)" }}>
+              PharmaCI
+            </span>
           </div>
         </header>
 
+        {/* Translation overlay */}
         {translating && (
-          <div className="fixed inset-0 z-30 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center no-print">
-            <Loader2 className="h-12 w-12 animate-spin" style={{ color: "#4ec2a7" }} />
-            <p className="mt-4 font-medium" style={{ color: "#1f7f6e" }}>
+          <div className="fixed inset-0 z-30 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center no-print">
+            <Loader2 className="h-10 w-10 animate-spin" style={{ color: "var(--accent-primary)" }} />
+            <p className="mt-4 font-medium text-sm" style={{ color: "var(--neutral-dark)" }}>
               {lang === "it" ? "Traduzione in corso..." : "Translating..."}
             </p>
           </div>
         )}
 
         {translateErr && (
-          <div className="max-w-6xl mx-auto px-4 pt-3 no-print">
-            <div className="rounded-lg border border-red-300 bg-red-50 text-red-700 text-sm px-4 py-2">
+          <div className="max-w-5xl mx-auto px-4 pt-3 no-print">
+            <div
+              className="rounded-md text-sm px-4 py-2"
+              style={{ background: "#fde8e2", color: "#a83219", border: "1px solid #f5c6bb" }}
+            >
               {lang === "it" ? "Traduzione non riuscita: " : "Translation failed: "}
               {translateErr}
             </div>
           </div>
         )}
 
+        {/* ── Report content ────────────────────────────────────── */}
         <ForceOpenContext.Provider value={forceOpen}>
-        <main ref={mainRef} data-report-root className="max-w-6xl mx-auto px-4 py-6 space-y-4">
-          <div id="exec-summary" style={{ scrollMarginTop: 72 }}>
-            <ExecSummary data={data} />
-          </div>
-          <section
-            id="visual-analysis"
-            className="rounded-[16px] bg-white p-8"
-            style={{ border: "1px solid rgba(78,194,167,0.2)", scrollMarginTop: 72 }}
+          <main
+            ref={mainRef}
+            data-report-root
+            className="max-w-5xl mx-auto px-4 py-6 space-y-4"
           >
-            <div
-              className="text-[11px] font-bold uppercase mb-2"
-              style={{ color: "#4ec2a7", letterSpacing: "0.1em" }}
+            <div id="exec-summary" style={{ scrollMarginTop: 64 }}>
+              <ExecSummary data={data} />
+            </div>
+
+            <section
+              id="visual-analysis"
+              className="rounded-md bg-white p-6"
+              style={{ border: "1px solid var(--border-color)", scrollMarginTop: 64 }}
             >
-              {lang === "it" ? "Analisi Visiva" : "Visual Analysis"}
+              <div
+                className="text-[10px] font-bold uppercase tracking-[0.12em] mb-4"
+                style={{ color: "var(--neutral-mid)" }}
+              >
+                {lang === "it" ? "Analisi Visiva" : "Visual Analysis"}
+              </div>
+              <div ref={chartsRef}>
+                <Charts data={data} />
+              </div>
+            </section>
+
+            <div id="pipeline"  style={{ scrollMarginTop: 64 }}><PipelineSection  data={data} /></div>
+            <div id="approved"  style={{ scrollMarginTop: 64 }}><ApprovedSection  data={data} /></div>
+            <div id="threat"    style={{ scrollMarginTop: 64 }}><ThreatSection    data={data} /></div>
+            <div id="ttm"       style={{ scrollMarginTop: 64 }}><TtmSection       data={data} /></div>
+            <div id="innov"     style={{ scrollMarginTop: 64 }}><InnovSection     data={data} /></div>
+            <div id="endpoint"  style={{ scrollMarginTop: 64 }}><EndpointSection  data={data} /></div>
+            <div id="literature"style={{ scrollMarginTop: 64 }}><PublicationsSection data={data} /></div>
+            <div id="validation"style={{ scrollMarginTop: 64 }}>
+              <ValidationSection data={data} validationError={validationError} />
             </div>
-            <div ref={chartsRef}>
-              <Charts data={data} />
-            </div>
-          </section>
-          <div id="pipeline" style={{ scrollMarginTop: 72 }}><PipelineSection data={data} /></div>
-          <div id="approved" style={{ scrollMarginTop: 72 }}><ApprovedSection data={data} /></div>
-          <div id="threat" style={{ scrollMarginTop: 72 }}><ThreatSection data={data} /></div>
-          <div id="ttm" style={{ scrollMarginTop: 72 }}><TtmSection data={data} /></div>
-          <div id="innov" style={{ scrollMarginTop: 72 }}><InnovSection data={data} /></div>
-          <div id="endpoint" style={{ scrollMarginTop: 72 }}><EndpointSection data={data} /></div>
-          <div id="literature" style={{ scrollMarginTop: 72 }}><PublicationsSection data={data} /></div>
-          <div id="validation" style={{ scrollMarginTop: 72 }}>
-            <ValidationSection data={data} validationError={validationError} />
-          </div>
-        </main>
+          </main>
         </ForceOpenContext.Provider>
-        <footer className="text-center text-xs py-6 no-print" style={{ color: "rgba(31,127,110,0.5)" }}>
+
+        <footer
+          className="text-center text-[11px] py-5 no-print"
+          style={{ color: "var(--neutral-mid)" }}
+        >
           PharmaCI
         </footer>
       </div>

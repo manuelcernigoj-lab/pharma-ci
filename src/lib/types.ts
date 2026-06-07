@@ -18,6 +18,7 @@ export interface ReportData {
     generic_name?: string;
     manufacturer?: string;
     indication_summary?: string;
+    agency?: "FDA" | "EMA" | "BOTH";   // NEW — set by normalize.ts
   }>;
   threat_assessment?: {
     summary?: string;
@@ -40,12 +41,9 @@ export interface ReportData {
       fda?: string;
       ema?: string;
       italy?: string;
-      fda_start?: number;
-      fda_end?: number;
-      ema_start?: number;
-      ema_end?: number;
-      italy_start?: number;
-      italy_end?: number;
+      fda_start?: number; fda_end?: number;
+      ema_start?: number; ema_end?: number;
+      italy_start?: number; italy_end?: number;
     }>;
   };
   aifa_innovativity?: {
@@ -67,6 +65,7 @@ export interface ReportData {
       pfs_months?: number | null;
       os_months?: number | null;
       orr_percent?: number | null;
+      therapeutic_setting?: string;    // NEW — e.g. "1L", "2L", "adjuvant"
       study_context?: string;
       source_pmid?: string;
     }>;
@@ -84,7 +83,7 @@ export interface ReportData {
     confidence_overall?: string;
     issues?: Array<{ section?: string; severity?: string; description?: string }>;
     data_quality_notes?: string;
-  };
+  } | null;
   chart_data?: {
     pipeline_by_phase_chart?: Array<{ phase: string; trials: number }>;
     publications_by_month_chart?: Array<{ month: string; publications: number }>;
@@ -101,4 +100,3 @@ export interface ReportData {
     publications?: number;
   };
 }
-

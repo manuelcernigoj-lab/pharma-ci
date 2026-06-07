@@ -3,27 +3,25 @@ import { useI18n } from "@/lib/i18n";
 export function LangToggle() {
   const { lang, setLang } = useI18n();
   return (
-    <div className="inline-flex items-center rounded-full border border-border bg-card p-1 shadow-sm no-print">
-      <button
-        type="button"
-        onClick={() => setLang("it")}
-        className={`px-3 py-1 rounded-full text-sm font-medium transition ${
-          lang === "it" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-        }`}
-        aria-label="Italiano"
-      >
-        🇮🇹 IT
-      </button>
-      <button
-        type="button"
-        onClick={() => setLang("en")}
-        className={`px-3 py-1 rounded-full text-sm font-medium transition ${
-          lang === "en" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-        }`}
-        aria-label="English"
-      >
-        🇬🇧 EN
-      </button>
+    <div
+      className="inline-flex items-center rounded p-0.5 gap-0.5 no-print"
+      style={{ background: "#f0ede8", border: "1px solid var(--border-color)" }}
+    >
+      {(["en", "it"] as const).map((l) => (
+        <button
+          key={l}
+          type="button"
+          onClick={() => setLang(l)}
+          className="px-3 py-1 rounded text-[11px] font-semibold transition-colors"
+          style={{
+            background: lang === l ? "var(--accent-primary)" : "transparent",
+            color:      lang === l ? "#ffffff" : "var(--neutral-mid)",
+          }}
+          aria-label={l === "en" ? "English" : "Italiano"}
+        >
+          {l === "en" ? "🇬🇧 EN" : "🇮🇹 IT"}
+        </button>
+      ))}
     </div>
   );
 }

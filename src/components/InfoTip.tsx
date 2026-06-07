@@ -8,13 +8,25 @@ export function InfoTip({ text }: { text: string }) {
         <TooltipTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center justify-center text-muted-foreground hover:text-accent-dark transition"
+            className="inline-flex items-center justify-center transition-colors"
+            style={{ color: "var(--neutral-mid)" }}
             aria-label="info"
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--neutral-dark)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--neutral-mid)"; }}
           >
-            <Info className="h-4 w-4" />
+            <Info className="h-3.5 w-3.5" />
           </button>
         </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+        <TooltipContent
+          side="top"
+          className="max-w-xs text-[11px] leading-relaxed"
+          style={{
+            background: "var(--neutral-dark)",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "4px",
+          }}
+        >
           {text}
         </TooltipContent>
       </Tooltip>

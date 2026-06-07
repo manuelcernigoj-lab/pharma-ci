@@ -27,21 +27,24 @@ function fmtTime(s: number) {
 function IndexPage() {
   const { t, lang } = useI18n();
   const navigate = useNavigate();
-  const [query, setQuery] = useState("");
-  const [refDrug, setRefDrug] = useState("");
-  const [maxTrials, setMaxTrials] = useState<string>("25");
+
+  const [query,      setQuery]      = useState("");
+  const [refDrug,    setRefDrug]    = useState("");
+  const [maxTrials,  setMaxTrials]  = useState<string>("25");
   const [monthsBack, setMonthsBack] = useState<string>("12");
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [submitted,  setSubmitted]  = useState(false);
+  const [loading,    setLoading]    = useState(false);
+  const [err,        setErr]        = useState<string | null>(null);
 
   const [loadingIdx, setLoadingIdx] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
+  const [elapsed,    setElapsed]    = useState(0);
+
   useEffect(() => {
     if (!loading) return;
     const id = setInterval(() => setLoadingIdx((i) => (i + 1) % 4), 3000);
     return () => clearInterval(id);
   }, [loading]);
+
   useEffect(() => {
     if (!loading) { setElapsed(0); return; }
     const id = setInterval(() => setElapsed((s) => s + 1), 1000);
@@ -58,21 +61,23 @@ function IndexPage() {
     setLoading(true);
     try {
       const body: Record<string, unknown> = {
-        query: query.trim(),
-        max_trials: clamp(maxTrials, 5, 50, 25),
-        months_back: clamp(monthsBack, 3, 36, 12),
+        query:      query.trim(),
+        max_trials: clamp(maxTrials,  5, 50, 25),
+        months_back:clamp(monthsBack, 3, 36, 12),
       };
       if (refDrug.trim()) body.reference_drug = refDrug.trim();
+
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000);
+      const timeoutId  = setTimeout(() => controller.abort(), 300_000);
       const res = await fetch(WEBHOOK, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
         signal: controller.signal,
       }).finally(() => clearTimeout(timeoutId));
+
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data       = await res.json();
       const normalized = normalizeReport(data);
       if (!normalized) throw new Error("Empty report");
       reportStore.set(normalized);
@@ -84,157 +89,163 @@ function IndexPage() {
     }
   }
 
+  /* ── Loading screen ─────────────────────────────────────────── */
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4" style={{ background: "#f4fffb" }}>
-        <Loader2 className="h-12 w-12 animate-spin" style={{ color: "#4ec2a7" }} strokeWidth={3} />
-        <p className="mt-6 text-[16px] font-medium" style={{ color: "#1f7f6e" }}>
+      <div
+        className="min-h-screen flex flex-col items-center justify-center px-4"
+        style={{ background: "#faf9f5" }}
+      >
+        <Loader2
+          className="h-10 w-10 animate-spin"
+          style={{ color: "var(--accent-primary)" }}
+          strokeWidth={2.5}
+        />
+        <p className="mt-5 text-[15px] font-semibold" style={{ color: "var(--neutral-dark)" }}>
           {t(loadingKeys[loadingIdx])}
         </p>
-        <p className="mt-3 text-[13px]" style={{ color: "rgba(31,127,110,0.45)" }}>{fmtTime(elapsed)}</p>
-        <p className="mt-2 text-[12px]" style={{ color: "rgba(31,127,110,0.35)" }}>
-          {lang === "it" ? "Le query complesse possono richiedere fino a 60 secondi." : "Complex queries may take up to 60 seconds."}
+        <p className="mt-2 text-[12px]" style={{ color: "var(--neutral-mid)" }}>
+          {fmtTime(elapsed)}
+        </p>
+        <p className="mt-1 text-[11px]" style={{ color: "var(--neutral-muted)" }}>
+          {lang === "it"
+            ? "Le query complesse possono richiedere fino a 60 secondi."
+            : "Complex queries may take up to 60 seconds."}
         </p>
       </div>
     );
   }
 
+  /* ── Main page ──────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen relative" style={{ background: "#f4fffb" }}>
+    <div className="min-h-screen" style={{ background: "#faf9f5" }}>
       <Sidebar page="home" />
 
-      <div className="md:ml-[var(--sidebar-w,240px)] transition-[margin] duration-300 ease-out">
-        {/* Slim navbar */}
+      <div className="md:ml-[var(--sidebar-w,224px)] transition-[margin] duration-300 ease-out">
+
+        {/* Top bar */}
         <header
-          className="sticky top-0 z-20 bg-white border-b"
-          style={{ height: 52, borderColor: "rgba(78,194,167,0.15)" }}
+          className="sticky top-0 z-20 bg-white"
+          style={{ height: 48, borderBottom: "1px solid var(--border-color)" }}
         >
-          <div className="h-full max-w-6xl mx-auto px-4 flex items-center gap-2 pl-14 md:pl-4">
-            <img src={logo} alt="" className="h-6 w-6 rounded" />
-            <span className="font-bold text-[17px]" style={{ color: "#1f7f6e" }}>PharmaCI</span>
+          <div className="h-full max-w-4xl mx-auto px-4 flex items-center gap-2 pl-14 md:pl-4">
+            <img src={logo} alt="" className="h-5 w-5 rounded" />
+            <span className="font-bold text-[15px]" style={{ color: "var(--neutral-dark)" }}>PharmaCI</span>
           </div>
         </header>
 
         {/* Hero */}
-        <div id="home" className="relative">
-          <div
-            aria-hidden
-            className="absolute inset-x-0 top-0 h-[400px] pointer-events-none"
-            style={{
-              background:
-                "radial-gradient(ellipse 80% 50% at 50% 0%, rgba(78,194,167,0.18) 0%, transparent 70%)",
-            }}
-          />
-          <section className="relative max-w-[680px] mx-auto px-6 pt-16 pb-10 text-center">
-            <PillBadge>
-              <span
-                className="inline-block w-1 h-1 rounded-full mr-2"
-                style={{ background: "#4ec2a7", animation: "pharma-pulse 2s infinite" }}
-              />
+        <div id="home">
+          <section className="max-w-2xl mx-auto px-6 pt-14 pb-10 text-center">
+            <Chip>
               {lang === "it"
                 ? "AI · Clinical Intelligence · Strategia Pharma"
                 : "AI-powered · Clinical Intelligence · Pharma Strategy"}
-            </PillBadge>
+            </Chip>
 
             <h2
-              className="mt-6 font-extrabold leading-[1.1]"
-              style={{ color: "#1f7f6e", fontSize: "clamp(30px, 5vw, 50px)" }}
+              className="mt-6 font-bold leading-[1.15] tracking-tight"
+              style={{ color: "var(--neutral-dark)", fontSize: "clamp(26px,4.5vw,42px)" }}
             >
-              {lang === "it" ? "Dalla query al report strategico." : "From query to strategic report."}
+              {lang === "it"
+                ? "Dalla query al report strategico."
+                : "From query to strategic report."}
               <br />
-              <span style={{ color: "#4ec2a7", fontWeight: 400 }}>
+              <span style={{ color: "var(--accent-primary)", fontWeight: 400 }}>
                 {lang === "it" ? "In meno di 60 secondi." : "In under 60 seconds."}
               </span>
             </h2>
 
             <p
-              className="mt-5 mx-auto text-[17px] max-w-[500px]"
-              style={{ color: "rgba(31,127,110,0.7)" }}
+              className="mt-4 text-[15px] max-w-md mx-auto"
+              style={{ color: "var(--neutral-mid)", lineHeight: 1.7 }}
             >
               {lang === "it"
-                ? "Inserisci un target. PharmaCI interroga ClinicalTrials.gov, OpenFDA e PubMed — poi genera un report completo di competitive intelligence."
-                : "Type a target. PharmaCI queries ClinicalTrials.gov, OpenFDA and PubMed — then generates a full competitive intelligence report."}
+                ? "Inserisci un target. PharmaCI interroga ClinicalTrials.gov, OpenFDA e PubMed, poi genera un report completo di competitive intelligence."
+                : "Type a target. PharmaCI queries ClinicalTrials.gov, OpenFDA and PubMed, then generates a full competitive intelligence report."}
             </p>
 
-            <div className="mt-5 flex flex-wrap justify-center gap-2">
-              <PillBadge small>{lang === "it" ? "17 fonti di trial" : "17 trial sources"}</PillBadge>
-              <PillBadge small>{lang === "it" ? "Farmaci approvati FDA" : "FDA approved drugs"}</PillBadge>
-              <PillBadge small>{lang === "it" ? "Insight generati con AI" : "AI-generated insights"}</PillBadge>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <Chip small>ClinicalTrials.gov</Chip>
+              <Chip small>OpenFDA</Chip>
+              <Chip small>PubMed</Chip>
+              <Chip small>{lang === "it" ? "Claude AI" : "Claude AI"}</Chip>
             </div>
           </section>
-
         </div>
 
-
-
         {/* How it works */}
-        <section id="how" className="max-w-5xl mx-auto px-4 pb-20" style={{ scrollMarginTop: 72 }}>
-          <h3 className="text-[24px] font-bold text-center" style={{ color: "#1f7f6e" }}>
-            {lang === "it" ? "Come funziona" : "How it works"}
-          </h3>
-          <p className="text-[15px] text-center mt-2 mb-8" style={{ color: "rgba(31,127,110,0.6)" }}>
-            {lang === "it"
-              ? "Cosa accade dopo aver premuto Genera Report"
-              : "What happens after you click Generate Report"}
-          </p>
-          <div className="grid md:grid-cols-2 gap-5">
+        <section id="how" className="max-w-4xl mx-auto px-4 pb-16" style={{ scrollMarginTop: 64 }}>
+          <SectionTitle
+            title={lang === "it" ? "Come funziona" : "How it works"}
+            sub={lang === "it" ? "Cosa accade dopo aver premuto Genera Report" : "What happens after you click Generate Report"}
+          />
+          <div className="grid md:grid-cols-2 gap-4 mt-6">
             {[
               {
-                n: "1",
-                t: lang === "it" ? "Inserisci il target" : "Enter your target",
+                n: "01",
+                t: lang === "it" ? "Inserisci il target"   : "Enter your target",
                 d: lang === "it"
-                  ? "Inserisci un target biologico o area terapeutica — es. KRAS G12C NSCLC. Aggiungi un farmaco di riferimento per il benchmarking competitivo."
-                  : "Type a biological target or therapeutic area — e.g. KRAS G12C NSCLC. Add a reference drug for head-to-head competitive benchmarking.",
+                  ? "Target biologico o area terapeutica — es. KRAS G12C NSCLC. Aggiungi un farmaco di riferimento per il benchmarking competitivo."
+                  : "Biological target or therapeutic area — e.g. KRAS G12C NSCLC. Add a reference drug for competitive benchmarking.",
               },
               {
-                n: "2",
-                t: lang === "it" ? "Imposta i parametri" : "Set your parameters",
+                n: "02",
+                t: lang === "it" ? "Imposta i parametri"   : "Set your parameters",
                 d: lang === "it"
-                  ? "max_trials controlla quanti trial recuperare. months_back imposta la finestra PubMed. Valori più bassi = report più rapido."
-                  : "max_trials controls how many clinical trials to retrieve. months_back sets how far back to search PubMed. Lower values = faster report.",
+                  ? "max_trials controlla quanti trial recuperare. months_back imposta la finestra PubMed. Valori più bassi = risposta più rapida."
+                  : "max_trials controls how many trials to retrieve. months_back sets the PubMed window. Lower values = faster report.",
               },
               {
-                n: "3",
+                n: "03",
                 t: lang === "it" ? "L'AI genera il report" : "AI generates the report",
                 d: lang === "it"
-                  ? "PharmaCI interroga ClinicalTrials.gov, OpenFDA e PubMed in parallelo. Claude AI sintetizza un report strategico con threat score, forecast regolatori e valutazione AIFA."
-                  : "PharmaCI queries ClinicalTrials.gov, OpenFDA and PubMed in parallel. Claude AI synthesizes a structured strategic report with threat scoring, regulatory forecasts and AIFA assessment.",
+                  ? "Claude AI sintetizza un report strategico con threat score, forecast regolatori e valutazione AIFA."
+                  : "Claude AI synthesizes a report with threat scores, regulatory forecasts and AIFA assessment.",
               },
               {
-                n: "4",
-                t: lang === "it" ? "Esplora ed esporta" : "Explore and export",
+                n: "04",
+                t: lang === "it" ? "Esplora ed esporta"   : "Explore and export",
                 d: lang === "it"
-                  ? "Naviga il report dalla sidebar di sinistra. Usa le azioni per avviare il Critic Agent o esportare il report come PDF e i grafici come PNG."
-                  : "Navigate the interactive report via the left sidebar. Use sidebar actions to run the Critic Agent validation or export the full report as PDF and charts as PNG.",
+                  ? "Naviga il report dalla sidebar. Esegui il Critic Agent per la validazione, o esporta PDF e grafici PNG."
+                  : "Navigate via the sidebar. Run Critic Agent validation, or export PDF and PNG charts.",
               },
             ].map((s) => (
               <div
                 key={s.n}
-                className="pharma-step bg-white p-7 rounded-[16px]"
-                style={{ border: "1px solid rgba(78,194,167,0.2)", transition: "all 0.25s ease" }}
+                className="bg-white rounded-md p-6 transition-shadow hover:shadow-sm"
+                style={{ border: "1px solid var(--border-color)" }}
               >
-                <div className="text-[42px] font-extrabold leading-none" style={{ color: "rgba(78,194,167,0.25)" }}>
+                <div
+                  className="text-[36px] font-black leading-none mb-3"
+                  style={{ color: "var(--border-color)" }}
+                >
                   {s.n}
                 </div>
-                <h4 className="text-[16px] font-bold mt-2 mb-1.5" style={{ color: "#1f7f6e" }}>{s.t}</h4>
-                <p className="text-[14px] leading-relaxed" style={{ color: "rgba(31,127,110,0.65)" }}>{s.d}</p>
+                <h4 className="text-[14px] font-bold mb-1.5" style={{ color: "var(--neutral-dark)" }}>
+                  {s.t}
+                </h4>
+                <p className="text-[13px] leading-relaxed" style={{ color: "var(--neutral-mid)" }}>
+                  {s.d}
+                </p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* Form card */}
-        <section id="form" className="relative max-w-5xl mx-auto px-4 pb-16" style={{ scrollMarginTop: 72 }}>
+        {/* ── Query form ─────────────────────────────────────────── */}
+        <section id="form" className="max-w-4xl mx-auto px-4 pb-20" style={{ scrollMarginTop: 64 }}>
           <form
             onSubmit={onSubmit}
             noValidate
-            className="bg-white p-10 rounded-[20px]"
+            className="bg-white rounded-md p-8"
             style={{
-              border: "1px solid rgba(78,194,167,0.25)",
-              boxShadow: "0 4px 40px rgba(31,127,110,0.08)",
+              border:     "1px solid var(--border-color)",
+              boxShadow:  "0 2px 16px rgba(0,0,0,0.04)",
             }}
           >
             <div className="space-y-5">
+              {/* Query */}
               <Field
                 label={t("query_label")}
                 tip={t("query_tip")}
@@ -246,10 +257,11 @@ function IndexPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t("query_ph")}
-                  className="pharma-input"
+                  className="form-input"
                 />
               </Field>
 
+              {/* Reference drug */}
               <Field
                 label={t("ref_label")}
                 tip={t("ref_tip")}
@@ -260,99 +272,134 @@ function IndexPage() {
                   value={refDrug}
                   onChange={(e) => setRefDrug(e.target.value)}
                   placeholder={t("ref_ph")}
-                  className="pharma-input"
+                  className="form-input"
                 />
               </Field>
 
+              {/* Numeric params */}
               <div className="grid sm:grid-cols-2 gap-4">
-                <Field label={t("trials_label")} tip={t("trials_tip")} required valueBadge={maxTrials}>
+                <Field
+                  label={t("trials_label")}
+                  tip={t("trials_tip")}
+                  required
+                  valueBadge={maxTrials}
+                >
                   <input
-                    type="number" inputMode="numeric" min={5} max={50} step={1}
+                    type="number"
+                    inputMode="numeric"
+                    min={5} max={50} step={1}
                     value={maxTrials}
                     onChange={(e) => setMaxTrials(e.target.value)}
                     onBlur={(e) => setMaxTrials(String(clamp(e.target.value, 5, 50, 25)))}
-                    className="pharma-input"
+                    className="form-input"
                   />
                 </Field>
-                <Field label={t("months_label")} tip={t("months_tip")} required valueBadge={monthsBack}>
+                <Field
+                  label={t("months_label")}
+                  tip={t("months_tip")}
+                  required
+                  valueBadge={monthsBack}
+                >
                   <input
-                    type="number" inputMode="numeric" min={3} max={36} step={1}
+                    type="number"
+                    inputMode="numeric"
+                    min={3} max={36} step={1}
                     value={monthsBack}
                     onChange={(e) => setMonthsBack(e.target.value)}
                     onBlur={(e) => setMonthsBack(String(clamp(e.target.value, 3, 36, 12)))}
-                    className="pharma-input"
+                    className="form-input"
                   />
                 </Field>
               </div>
 
-              <button
-                type="submit"
-                className="pharma-cta w-full rounded-[12px] text-white text-[16px] font-bold"
-                style={{
-                  height: 52,
-                  background: "linear-gradient(135deg, #4ec2a7 0%, #1f7f6e 100%)",
-                  boxShadow: "0 4px 20px rgba(78,194,167,0.35)",
-                  transition: "all 0.25s ease",
-                }}
-              >
+              {/* Submit */}
+              <button type="submit" className="submit-btn w-full">
                 {t("generate")} →
               </button>
-              {err && <p className="text-sm text-red-600 text-center" role="alert">{err}</p>}
+
+              {err && (
+                <p className="text-[12px] text-center" style={{ color: "#a83219" }} role="alert">
+                  {err}
+                </p>
+              )}
             </div>
           </form>
         </section>
 
-
-        <footer className="text-center text-xs py-4" style={{ color: "rgba(31,127,110,0.5)" }}>
+        <footer
+          className="text-center text-[11px] py-4"
+          style={{ color: "var(--neutral-mid)" }}
+        >
           PharmaCI · {lang === "it" ? "Strumento di intelligence farmaceutica" : "Pharma intelligence tool"}
         </footer>
       </div>
 
+      {/* ── Inline styles (no oklch, pure hex) ──────────────────── */}
       <style>{`
-        .pharma-input {
+        .form-input {
           width: 100%;
-          border-radius: 10px;
-          border: 1.5px solid #d3f7ec;
-          background: #f4fffb;
-          padding: 12px 16px;
-          font-size: 15px;
-          color: #1f7f6e;
-          transition: all 0.2s ease;
-        }
-        .pharma-input:focus {
+          border-radius: 4px;
+          border: 1px solid #e2e0db;
+          background: #faf9f5;
+          padding: 10px 14px;
+          font-size: 14px;
+          color: #141413;
+          transition: border-color 0.15s, box-shadow 0.15s;
           outline: none;
-          border-color: #4ec2a7;
-          box-shadow: 0 0 0 3px rgba(78,194,167,0.15);
         }
-        .pharma-input::-webkit-outer-spin-button,
-        .pharma-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        .pharma-input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
-        .pharma-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(78,194,167,0.45); }
-        .pharma-cta:active { transform: translateY(0); }
-        .pharma-step:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(31,127,110,0.1); }
-        @keyframes pharma-pulse {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.4); opacity: 0.4; }
+        .form-input:focus {
+          border-color: #d97757;
+          box-shadow: 0 0 0 3px rgba(217,119,87,0.12);
         }
+        .form-input::-webkit-outer-spin-button,
+        .form-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+        .form-input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+        .submit-btn {
+          height: 48px;
+          border-radius: 4px;
+          background: #d97757;
+          color: #ffffff;
+          font-size: 14px;
+          font-weight: 700;
+          border: none;
+          cursor: pointer;
+          transition: background 0.15s, box-shadow 0.15s;
+          letter-spacing: 0.01em;
+        }
+        .submit-btn:hover {
+          background: #c46843;
+          box-shadow: 0 4px 16px rgba(217,119,87,0.28);
+        }
+        .submit-btn:active { background: #b05a38; }
       `}</style>
     </div>
   );
 }
 
-function PillBadge({ children, small }: { children: React.ReactNode; small?: boolean }) {
+/* ── Small helper components ─────────────────────────────────── */
+function Chip({ children, small }: { children: React.ReactNode; small?: boolean }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full ${small ? "text-[11px] px-3 py-1" : "text-[11px] px-4 py-1.5"} uppercase`}
+      className={`inline-flex items-center rounded-full font-semibold uppercase tracking-[0.07em]
+        ${small ? "text-[10px] px-3 py-1" : "text-[10px] px-4 py-1.5"}`}
       style={{
-        background: "#d3f7ec",
-        color: "#1f7f6e",
-        border: "1px solid #9fe5d0",
-        letterSpacing: "0.06em",
-        fontWeight: 600,
+        background: "#f5ece6",
+        color:      "#d97757",
+        border:     "1px solid #e8c4b0",
       }}
     >
       {children}
     </span>
+  );
+}
+
+function SectionTitle({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <div className="text-center">
+      <h3 className="text-[20px] font-bold" style={{ color: "var(--neutral-dark)" }}>{title}</h3>
+      {sub && <p className="text-[13px] mt-1" style={{ color: "var(--neutral-mid)" }}>{sub}</p>}
+    </div>
   );
 }
 
@@ -369,17 +416,18 @@ function Field({
 }) {
   return (
     <div>
-      <div className="flex items-center gap-1.5 mb-2">
+      <div className="flex items-center gap-1.5 mb-1.5">
         <label
-          className="text-[12px] font-bold uppercase"
-          style={{ color: "#1f7f6e", letterSpacing: "0.07em" }}
+          className="text-[11px] font-bold uppercase tracking-[0.08em]"
+          style={{ color: "var(--neutral-dark)" }}
         >
-          {label}{required && <span className="text-red-600 ml-0.5">*</span>}
+          {label}
+          {required && <span style={{ color: "#a83219" }} className="ml-0.5">*</span>}
         </label>
         {optional && (
           <span
-            className="text-[10px] font-semibold rounded-full px-2 py-0.5"
-            style={{ background: "#d3f7ec", color: "#1f7f6e" }}
+            className="text-[9px] font-bold rounded-full px-2 py-0.5"
+            style={{ background: "#f0ede8", color: "var(--neutral-mid)" }}
           >
             {optional}
           </span>
@@ -387,15 +435,17 @@ function Field({
         {tip && <InfoTip text={tip} />}
         {valueBadge && (
           <span
-            className="ml-auto text-[11px] font-semibold rounded-full px-2 py-0.5"
-            style={{ background: "#d3f7ec", color: "#1f7f6e" }}
+            className="ml-auto text-[10px] font-semibold rounded-full px-2 py-0.5"
+            style={{ background: "#f5ece6", color: "#d97757" }}
           >
             {valueBadge}
           </span>
         )}
       </div>
       {children}
-      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+      {error && (
+        <p className="text-[11px] mt-1" style={{ color: "#a83219" }}>{error}</p>
+      )}
     </div>
   );
 }

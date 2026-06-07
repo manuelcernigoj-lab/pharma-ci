@@ -5,52 +5,62 @@ export function ExecSummary({ data }: { data: ReportData }) {
   const { t } = useI18n();
   const threats = data.chart_data?.threat_scores_chart ?? data.chart_data?.threat_scores ?? [];
   const top = [...threats].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+
+  // Bug fix: use stats.publications (total count from API), not top_publications.length
   const metrics = [
-    { label: t("active_trials"), value: data.pipeline?.total_active_trials ?? data.pipeline?.trials?.length ?? 0 },
+    { label: t("active_trials"),  value: data.pipeline?.total_active_trials ?? data.pipeline?.trials?.length ?? 0 },
     { label: t("approved_drugs"), value: data.approved_drugs?.length ?? 0 },
-    { label: t("publications"), value: data.stats?.publications ?? data.top_publications?.length ?? 0 },
-    { label: t("top_threat"), value: top?.drug ?? "—" },
+    { label: t("publications"),   value: data.stats?.publications ?? data.top_publications?.length ?? 0 },
+    { label: t("top_threat"),     value: top?.drug ?? "—" },
   ];
+
   return (
     <section
-      className="rounded-[16px] bg-white p-8"
-      style={{ border: "1px solid rgba(78,194,167,0.2)" }}
+      className="rounded-lg bg-white p-8"
+      style={{ border: "1px solid var(--border-color)" }}
     >
+      {/* Label */}
       <div
-        className="text-[11px] font-bold uppercase mb-2"
-        style={{ color: "#4ec2a7", letterSpacing: "0.1em" }}
+        className="text-[10px] font-bold uppercase mb-3 tracking-[0.12em]"
+        style={{ color: "var(--neutral-mid)" }}
       >
         {t("exec_summary")}
       </div>
-      <p className="text-[16px] leading-[1.8] whitespace-pre-line" style={{ color: "#1f7f6e" }}>
+
+      {/* Summary text */}
+      <p
+        className="text-[15px] leading-[1.8] whitespace-pre-line"
+        style={{ color: "var(--neutral-dark)" }}
+      >
         {data.executive_summary || t("no_data")}
       </p>
+
+      {/* Metric chips */}
       <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
         {metrics.map((m) => (
           <div
             key={m.label}
-            className="exec-chip rounded-[12px] text-center px-5 py-3.5"
+            className="rounded-md text-center px-4 py-4"
             style={{
-              background: "#d3f7ec",
-              border: "1px solid rgba(78,194,167,0.2)",
-              transition: "all 0.2s ease",
+              background: "#faf9f5",
+              border: "1px solid var(--border-color)",
             }}
           >
-            <span className="block text-[26px] font-bold leading-tight" style={{ color: "#1f7f6e" }}>
+            <span
+              className="block text-[28px] font-bold leading-tight"
+              style={{ color: "var(--accent-primary)" }}
+            >
               {m.value}
             </span>
             <span
-              className="block text-[11px] uppercase mt-1"
-              style={{ color: "rgba(31,127,110,0.55)", letterSpacing: "0.06em" }}
+              className="block text-[10px] uppercase mt-1.5 tracking-[0.08em]"
+              style={{ color: "var(--neutral-mid)" }}
             >
               {m.label}
             </span>
           </div>
         ))}
       </div>
-      <style>{`
-        .exec-chip:hover { background: #9fe5d0; transform: translateY(-2px); }
-      `}</style>
     </section>
   );
 }
