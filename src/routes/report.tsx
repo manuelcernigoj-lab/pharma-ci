@@ -251,21 +251,29 @@ function ReportPage() {
         ctx.fillRect(0, 0, slice.width, slice.height);
         ctx.drawImage(
           canvas,
-          0, renderedPx,          // source x, y
-          canvas.width, sliceH,   // source w, h
-          0, 0,                    // dest x, y
-          canvas.width, sliceH    // dest w, h
+          0, renderedPx,        // source x, y
+          canvas.width, sliceH, // source w, h
+          0, 0,                  // dest x, y
+          canvas.width, sliceH  // dest w, h
         );
 
-        // Use PNG data URL — avoids jsPDF v4 "K.includes" JPEG type bug
+        // Use object-form of addImage to avoid jsPDF v4 "K.includes" string-format bug.
+        // imageData as data URL lets jsPDF auto-detect format from header bytes.
         const imgData  = slice.toDataURL("image/png");
         const sliceHmm = sliceH * mmPerPx;
 
         if (!firstPage) pdf.addPage();
         firstPage = false;
 
-        // jsPDF v4 addImage: (imageData, format, x, y, width, height)
-        pdf.addImage(imgData, "PNG", margin, margin, contentW, sliceHmm);
+        // jsPDF v4 object-form: avoids the positional string-format argument entirely
+        pdf.addImage({
+          imageData: imgData,
+          x:         margin,
+          y:         margin,
+          width:     contentW,
+          height:    sliceHmm,
+        });
+
         renderedPx += sliceH;
       }
 
