@@ -34,12 +34,6 @@ const levelBadge = (lvl?: string): React.CSSProperties => {
   return                                              { background: "#f0ede8", color: "var(--neutral-mid)" };
 };
 
-const agencyBadge = (agency?: string): React.CSSProperties => {
-  if (agency === "FDA")  return { background: "#e8f0f8", color: "#2d5382" };
-  if (agency === "EMA")  return { background: "#e8f5ee", color: "#2d7a4f" };
-  if (agency === "BOTH") return { background: "#fef3e2", color: "#8a5e0a" };
-  return                         { background: "#f0ede8", color: "var(--neutral-mid)" };
-};
 
 /* ── Table primitives ──────────────────────────────────────── */
 function Th({ children }: { children: React.ReactNode }) {
@@ -142,56 +136,139 @@ export function PipelineSection({ data }: { data: ReportData }) {
 /* ── Approved Drugs ────────────────────────────────────────── */
 export function ApprovedSection({ data }: { data: ReportData }) {
   const { t, lang } = useI18n();
-  const drugs = data.approved_drugs ?? [];
-
-  // Group by agency for display
+  const drugs    = data.approved_drugs ?? [];
   const fdaDrugs = drugs.filter((d) => !d.agency || d.agency === "FDA" || d.agency === "BOTH");
   const emaDrugs = drugs.filter((d) => d.agency === "EMA" || d.agency === "BOTH");
 
+  if (drugs.length === 0) {
+    return (
+      <Section icon={iconWrap(Check)} title={t("fda_approved")} count={0}>
+        <p className="text-sm" style={{ color: "var(--neutral-mid)" }}>{t("no_data")}</p>
+      </Section>
+    );
+  }
+
   return (
     <Section icon={iconWrap(Check)} title={t("fda_approved")} count={drugs.length}>
-      {drugs.length === 0
-        ? <p className="text-sm" style={{ color: "var(--neutral-mid)" }}>{t("no_data")}</p>
-        : (
-          <div className="space-y-4">
-            {/* FDA */}
-            {fdaDrugs.length > 0 && (
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.1em] mb-2" style={{ color: "var(--neutral-mid)" }}>FDA</div>
-                <div className="grid md:grid-cols-2 gap-3">
-                  {fdaDrugs.map((d, i) => <DrugCard key={i} drug={d} agency="FDA" />)}
-                </div>
-              </div>
-            )}
-            {/* EMA */}
-            {emaDrugs.length > 0 && (
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.1em] mb-2 mt-2" style={{ color: "var(--neutral-mid)" }}>EMA</div>
-                <div className="grid md:grid-cols-2 gap-3">
-                  {emaDrugs.map((d, i) => <DrugCard key={i} drug={d} agency="EMA" />)}
-                </div>
-              </div>
-            )}
+      <div className="space-y-5">
+        {/* FDA */}
+        {fdaDrugs.length > 0 && (
+          <div>
+            <div
+              className="text-[10px] font-bold uppercase tracking-[0.1em] mb-2"
+              style={{ color: "var(--neutral-mid)" }}
+            >
+              FDA
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              {fdaDrugs.map((d, i) => <DrugCard key={i} drug={d} />)}
+            </div>
           </div>
         )}
+
+        {/* EMA */}
+        {emaDrugs.length > 0 && (
+          <div>
+            <div
+              className="text-[10px] font-bold uppercase tracking-[0.1em] mb-2"
+              style={{ color: "var(--neutral-mid)" }}
+            >
+              EMA — {lang === "it" ? "Farmaci autorizzati" : "Authorised medicines"}
+              <span
+                className="ml-2 font-normal normal-case tracking-normal"
+                style={{ color: "var(--neutral-mid)" }}
+              >
+                ({emaDrugs.length})
+              </span>
+            </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {emaDrugs.map((d, i) => <DrugCard key={i} drug={d} />)}
+            </div>
+          </div>
+        )}
+      </div>
     </Section>
   );
 }
 
-function DrugCard({ drug: d, agency }: { drug: NonNullable<ReportData["approved_drugs"]>[number]; agency: string }) {
-  const ab = agencyBadge(agency);
+function DrugCard({ drug: d }: { drug: NonNullable<ReportData["approved_drugs"]>[number] }) {
+  const isEma = d.agency === "EMA";
+
+  // FDA badge style: blue; EMA badge style: green
+  const badgeStyle: React.CSSProperties = isEma
+    ? { background: "#e8f5ee", color: "#2d7a4f", border: "1px solid #b8dfc5" }
+    : { background: "#e8f0f8", color: "#2d5382", border: "1px solid #b0c8e8" };
+
+  // For EMA drugs, indication_summary is a list of MeSH terms (e.g. "Arthritis, Rheumatoid; COVID-19")
+  // — display as small tags instead of prose
+  const indications = isEma && d.indication_summary
+    ? d.indication_summary.split(";").map((s) => s.trim()).filter(Boolean)
+    : null;
+
   return (
     <div
-      className="rounded-md p-4 bg-white"
+      className="rounded-md p-4 bg-white flex flex-col gap-1.5"
       style={{ border: "1px solid var(--border-color)" }}
     >
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <div className="text-[16px] font-bold" style={{ color: "var(--neutral-dark)" }}>{d.brand_name || "—"}</div>
-        <Badge style={ab}>{agency}</Badge>
+      {/* Header row: brand name + agency badge */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="font-bold text-[15px]" style={{ color: "var(--neutral-dark)" }}>
+          {d.brand_name || "—"}
+        </div>
+        <span
+          className="shrink-0 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+          style={badgeStyle}
+        >
+          {d.agency ?? "FDA"}
+        </span>
       </div>
-      {d.generic_name && <div className="text-[12px] italic mb-1" style={{ color: "var(--neutral-mid)" }}>{d.generic_name}</div>}
-      {d.manufacturer && <div className="text-sm font-medium mb-2" style={{ color: "var(--neutral-dark)" }}>{d.manufacturer}</div>}
-      {d.indication_summary && <p className="text-sm leading-relaxed" style={{ color: "var(--neutral-mid)" }}>{d.indication_summary}</p>}
+
+      {/* Generic name */}
+      {d.generic_name && (
+        <div className="text-[12px] italic" style={{ color: "var(--neutral-mid)" }}>
+          {d.generic_name}
+        </div>
+      )}
+
+      {/* Manufacturer — only if present (EMA entries often have empty manufacturer) */}
+      {d.manufacturer && (
+        <div className="text-[12px] font-medium" style={{ color: "var(--neutral-dark)" }}>
+          {d.manufacturer}
+        </div>
+      )}
+
+      {/* Auth date for EMA */}
+      {isEma && d.auth_date && (
+        <div className="text-[11px]" style={{ color: "var(--neutral-mid)" }}>
+          Authorised: {d.auth_date}
+        </div>
+      )}
+
+      {/* Indication — prose for FDA, tags for EMA */}
+      {indications ? (
+        <div className="flex flex-wrap gap-1 mt-1">
+          {indications.map((ind, i) => (
+            <span
+              key={i}
+              className="inline-block rounded-full px-2 py-0.5 text-[10px]"
+              style={{ background: "#f0ede8", color: "var(--neutral-mid)" }}
+            >
+              {ind}
+            </span>
+          ))}
+        </div>
+      ) : (
+        d.indication_summary && (
+          <p
+            className="text-[12px] leading-relaxed mt-1"
+            style={{ color: "var(--neutral-mid)" }}
+          >
+            {/* FDA indication_summary can be very long — truncate to first sentence */}
+            {d.indication_summary.split(/\.\s/)[0].replace(/^\d+\s+INDICATIONS.*?\n/i, "").trim()}
+            {d.indication_summary.length > 120 ? "." : ""}
+          </p>
+        )
+      )}
     </div>
   );
 }

@@ -18,7 +18,8 @@ export interface ReportData {
     generic_name?: string;
     manufacturer?: string;
     indication_summary?: string;
-    agency?: "FDA" | "EMA" | "BOTH";   // NEW — set by normalize.ts
+    agency?: "FDA" | "EMA" | "BOTH";
+    auth_date?: string;                 // EMA authorization date
   }>;
   threat_assessment?: {
     summary?: string;
