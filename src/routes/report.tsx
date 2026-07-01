@@ -14,96 +14,111 @@ import {
 import { Loader2 } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { translateStrings } from "@/lib/translate.functions";
-import { collectTranslatable, applyTranslations, deepClone } from "@/lib/translate-fields";
+import { collectTranslatable, deepClone } from "@/lib/translate-fields";
 import { ExportModal } from "@/components/report/ExportModal";
 import { ForceOpenContext } from "@/components/report/force-open";
 
 export const Route = createFileRoute("/report")({ component: ReportPage });
 
-/* ── PDF palette (resolved hex — no oklch) ───────────────────── */
-const PDF_STYLES = `
+/* ── Print styles (injected before window.print(), removed after) ── */
+/* Uses hex-only values — no oklch — to avoid browser print rendering bugs. */
+const PRINT_STYLES = `
+  /* ── Page setup ──────────────────────────────────────────────── */
+  @page { size: A4 portrait; margin: 12mm 14mm; }
+
+  /* ── Hex-only CSS vars (override any oklch in styles.css) ───── */
   :root {
-    --accent-primary: #d97757;
-    --neutral-dark: #141413;
-    --neutral-mid: #b0aea5;
-    --neutral-muted: #d6d4cf;
-    --bg: #faf9f5;
-    --surface: #ffffff;
-    --border-color: #e2e0db;
-    --background: #faf9f5;
-    --foreground: #141413;
-    --primary: #d97757;
-    --primary-foreground: #ffffff;
-    --muted-foreground: #b0aea5;
-    --border: #e2e0db;
-    --card: #ffffff;
-    --success: #5a9e6f;
-    --warning: #c8922a;
+    --accent-primary:    #d97757;
+    --neutral-dark:      #141413;
+    --neutral-mid:       #b0aea5;
+    --neutral-muted:     #d6d4cf;
+    --bg:                #ffffff;
+    --surface:           #ffffff;
+    --border-color:      #e2e0db;
+    --background:        #ffffff;
+    --foreground:        #141413;
+    --primary:           #d97757;
+    --primary-foreground:#ffffff;
+    --muted-foreground:  #b0aea5;
+    --border:            #e2e0db;
+    --card:              #ffffff;
+    --card-foreground:   #141413;
+    --success:           #5a9e6f;
+    --warning:           #c8922a;
+    --ring:              #d97757;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  /* ── Layout: single column, no sidebar gap ──────────────────── */
+  /* ── Hide non-report chrome ──────────────────────────────────── */
+  .no-print,
+  aside,
+  header,
+  [role="dialog"],
+  footer { display: none !important; }
+
+  /* ── Body ────────────────────────────────────────────────────── */
   body {
-    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif !important;
-    font-size: 11px !important;
-    line-height: 1.5 !important;
-    color: #141413 !important;
-    background: #ffffff !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #141413;
+    background: #ffffff;
   }
 
-  /* hide everything outside the report */
-  .no-print { display: none !important; }
+  /* ── Remove sidebar offset from content wrapper ─────────────── */
+  [data-content-wrapper] { margin-left: 0 !important; }
 
-  /* remove sidebar margin — the cloned node is the main element itself */
+  /* ── Report root ─────────────────────────────────────────────── */
   [data-report-root] {
     max-width: 100% !important;
     margin: 0 !important;
-    padding: 16px !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
+    padding: 0 !important;
   }
 
-  /* ── Cards & sections ───────────────────────────────────────── */
-  section, [class*="rounded"] {
-    border-radius: 4px !important;
-    page-break-inside: avoid !important;
+  /* ── Sections: keep whole, break BETWEEN sections not inside ── */
+  /* If a section is taller than one page the browser will break  */
+  /* it at a row/paragraph boundary rather than mid-element.      */
+  section,
+  [data-report-root] > div { 
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 10px;
   }
 
-  /* ── Typography scale-down ──────────────────────────────────── */
-  h1, h2 { font-size: 14px !important; }
-  h3, h4 { font-size: 12px !important; }
-  p, td, th, li, span { font-size: 11px !important; }
+  /* ── Force all collapsibles open ────────────────────────────── */
+  .collapsible-content {
+    display:         block   !important;
+    grid-template-rows: 1fr !important;
+    max-height:      none    !important;
+    overflow:        visible !important;
+    opacity:         1       !important;
+  }
 
-  /* exec summary big number */
-  .exec-metric-value { font-size: 20px !important; }
+  /* ── Typography scale ────────────────────────────────────────── */
+  h2 { font-size: 13px !important; font-weight: 700 !important; }
+  h3 { font-size: 11px !important; font-weight: 600 !important; }
+  p, td, th, li, span, div { font-size: 10px !important; }
 
-  /* ── Tables: no page split mid-row ──────────────────────────── */
-  table { border-collapse: collapse !important; width: 100% !important; }
-  tr    { page-break-inside: avoid !important; }
-  th, td {
-    padding: 4px 6px !important;
+  /* ── Tables: allow row-level breaks, not mid-row ────────────── */
+  table   { width: 100% !important; border-collapse: collapse !important; break-inside: auto; }
+  thead   { display: table-header-group; }        /* repeat headers on each page */
+  tr      { break-inside: avoid; page-break-inside: avoid; }
+  th, td  { 
+    padding: 3px 5px !important; 
     font-size: 10px !important;
     border-bottom: 1px solid #e2e0db !important;
     word-break: break-word !important;
-    max-width: 180px !important;
   }
 
-  /* ── Collapsibles: force open in PDF ───────────────────────── */
-  .collapsible-content {
-    display: block !important;
-    max-height: none !important;
-    overflow: visible !important;
-    opacity: 1 !important;
-    grid-template-rows: 1fr !important;
-  }
+  /* ── Charts: fixed height so they don't overflow a page ─────── */
+  .recharts-responsive-container { height: 190px !important; }
 
-  /* ── Charts: contain height ─────────────────────────────────── */
-  .recharts-responsive-container { height: 220px !important; }
-
-  /* ── Grid: single column on narrow PDF ─────────────────────── */
-  .grid { display: block !important; }
-  .grid > * { margin-bottom: 8px !important; width: 100% !important; }
+  /* ── Grids: single column in print ──────────────────────────── */
+  .grid           { display: block !important; }
+  .grid > *       { width: 100% !important; margin-bottom: 8px !important; }
+  .md\\:grid-cols-2,
+  .sm\\:grid-cols-2 { grid-template-columns: 1fr !important; }
 `;
 
 function ReportPage() {
@@ -141,20 +156,34 @@ function ReportPage() {
       setTranslateErr(null);
       try {
         const clone = deepClone(original);
-        const { texts } = collectTranslatable(clone);
-        if (!texts.length) { if (!cancelled) setTranslatedIt(clone); return; }
+
+        // Collect texts AND setters in a single pass so indices are
+        // guaranteed to be aligned. Re-calling collectTranslatable
+        // inside applyTranslations was the root cause of executive_summary
+        // not being translated (second call could yield a different order).
+        const { texts, setters } = collectTranslatable(clone);
+
+        if (!texts.length) {
+          if (!cancelled) setTranslatedIt({ ...clone });
+          return;
+        }
+
         const { translations } = await translateFn({ data: { texts, target: "it" } });
-        applyTranslations(clone, translations);
+
+        // Apply using the SAME setters from the same collectTranslatable
+        // call — index 0 in setters === index 0 in texts === index 0 in translations.
+        setters.forEach((setter, i) => {
+          if (typeof translations[i] === "string") setter(translations[i]);
+        });
+
         if (!cancelled) {
-          setTranslatedIt(clone);
-          setTranslateErr(null); // clear any previous error on success
+          // Spread to a new object reference so React always detects the update.
+          setTranslatedIt({ ...clone });
+          setTranslateErr(null);
         }
       } catch (e) {
-        // Only show error banner if we have no translated content at all
         if (!cancelled && !translatedIt) {
           console.warn("Translation failed (showing EN):", (e as Error).message);
-          // Do NOT set translateErr — the page works fine in English
-          // setTranslateErr(String((e as Error).message ?? e));
         }
       } finally {
         if (!cancelled) setTranslating(false);
@@ -167,135 +196,39 @@ function ReportPage() {
 
   const data: ReportData = lang === "it" ? (translatedIt ?? original) : original;
 
-  /* ── PDF Export ────────────────────────────────────────────── */
+  /* ── PDF Export — uses browser window.print() ─────────────── */
+  /* Avoids jsPDF canvas/blob restrictions in Cloudflare Workers. */
+  /* The browser renders directly from the live DOM: text stays   */
+  /* selectable, fonts are correct, no oklch conversion needed.   */
+  /* Sections with break-inside:avoid stay intact; oversized ones */
+  /* break at a row/paragraph boundary, never mid-element.        */
   const handleDownloadPdf = async () => {
-    if (!mainRef.current) return;
     setPdfBusy(true);
-    setForceOpen(true);
+    setForceOpen(true);                     // expand all collapsibles
 
-    // Give React time to expand all collapsibles
-    await new Promise((r) => setTimeout(r, 700));
+    // Wait for React to re-render expanded collapsibles
+    await new Promise((r) => setTimeout(r, 600));
 
-    try {
-      const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
-        import("html2canvas"),
-        import("jspdf"),
-      ]);
+    // Inject print-specific styles (hex-only, A4 page, layout fixes)
+    const styleTag = document.createElement("style");
+    styleTag.id    = "__pharmaci-print__";
+    styleTag.textContent = PRINT_STYLES;
+    document.head.appendChild(styleTag);
 
-      const el = mainRef.current;
-
-      /* 1. Inject PDF-specific stylesheet into the document */
-      const styleTag = document.createElement("style");
-      styleTag.id    = "__pharmaci-pdf-style__";
-      styleTag.textContent = PDF_STYLES;
-      document.head.appendChild(styleTag);
-
-      /* 2. Snapshot with html2canvas
-           – scale: 1.5 → good balance of sharpness vs file size
-           – windowWidth: A4 in px at 96dpi (794px) for proper text wrapping
-           – ignoreElements: skip sidebar, header, modals                      */
-      let canvas: HTMLCanvasElement;
-      try {
-        canvas = await html2canvas(el, {
-          scale: 1.5,
-          backgroundColor: "#ffffff",
-          useCORS: true,
-          windowWidth: 794,           // A4 width at 96dpi
-          windowHeight: el.scrollHeight,
-          ignoreElements: (node) => {
-            const cls = (node as HTMLElement).className ?? "";
-            const tag = (node as HTMLElement).tagName ?? "";
-            return (
-              cls.includes("no-print") ||
-              tag === "ASIDE" ||
-              tag === "HEADER" ||
-              cls.includes("ExportModal") ||
-              (node as HTMLElement).getAttribute?.("role") === "dialog"
-            );
-          },
-        });
-      } finally {
-        /* 3. Always remove the injected style */
-        styleTag.remove();
-      }
-
-      /* 4. Build paginated PDF
-           – A4 portrait: 210 × 297 mm
-           – 10mm margins on all sides
-           – content width: 190mm                                              */
-      const pdf      = new JsPDF({ orientation: "p", unit: "mm", format: "a4" });
-      const pageW    = 210;
-      const pageH    = 297;
-      const margin   = 10;
-      const contentW = pageW - margin * 2;   // 190mm
-
-      // Canvas → content dimensions in mm
-      const mmPerPx  = contentW / canvas.width;
-      const contentH = canvas.height * mmPerPx;  // total height in mm
-
-      // Slice height in px that fits one page
-      const pageHpx  = Math.floor((pageH - margin * 2) / mmPerPx);
-
-      let renderedPx = 0;
-      let firstPage  = true;
-
-      while (renderedPx < canvas.height) {
-        const sliceH = Math.min(pageHpx, canvas.height - renderedPx);
-
-        // Create a slice canvas for this page
-        const slice = document.createElement("canvas");
-        slice.width  = canvas.width;
-        slice.height = sliceH;
-        const ctx    = slice.getContext("2d")!;
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, slice.width, slice.height);
-        ctx.drawImage(
-          canvas,
-          0, renderedPx,        // source x, y
-          canvas.width, sliceH, // source w, h
-          0, 0,                  // dest x, y
-          canvas.width, sliceH  // dest w, h
-        );
-
-        // Use object-form of addImage to avoid jsPDF v4 "K.includes" string-format bug.
-        // imageData as data URL lets jsPDF auto-detect format from header bytes.
-        const imgData  = slice.toDataURL("image/png");
-        const sliceHmm = sliceH * mmPerPx;
-
-        if (!firstPage) pdf.addPage();
-        firstPage = false;
-
-        // jsPDF v4 object-form: avoids the positional string-format argument entirely
-        pdf.addImage({
-          imageData: imgData,
-          x:         margin,
-          y:         margin,
-          width:     contentW,
-          height:    sliceHmm,
-        });
-
-        renderedPx += sliceH;
-      }
-
-      /* 5. Download */
-      const blob = pdf.output("blob");
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a");
-      a.href     = url;
-      a.download = "pharmaci-report.pdf";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-
-    } catch (e) {
-      console.error("PDF export failed", e);
-      alert("PDF export failed: " + ((e as Error)?.message ?? String(e)));
-    } finally {
+    // Cleanup: fires when user closes the print dialog (print or cancel)
+    const cleanup = () => {
+      styleTag.remove();
       setForceOpen(false);
       setPdfBusy(false);
       setExportOpen(false);
-    }
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
+
+    // Fallback cleanup in case afterprint doesn't fire (some browsers)
+    setTimeout(cleanup, 30_000);
+
+    window.print();
   };
 
   /* ── Validation ────────────────────────────────────────────── */
@@ -351,6 +284,7 @@ function ReportPage() {
       {/* Content area — respects sidebar width via CSS var */}
       <div
         className="md:ml-[var(--sidebar-w,224px)] transition-[margin] duration-300 ease-out"
+        data-content-wrapper
       >
         {/* Slim top bar */}
         <header
