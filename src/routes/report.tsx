@@ -151,6 +151,8 @@ function ReportPage() {
   useEffect(() => {
     if (!original || lang !== "it" || translatedIt) return;
     let cancelled = false;
+    let errorTimer: ReturnType<typeof setTimeout> | undefined;
+
     (async () => {
       setTranslating(true);
       setTranslateErr(null);
@@ -179,17 +181,30 @@ function ReportPage() {
         if (!cancelled) {
           // Spread to a new object reference so React always detects the update.
           setTranslatedIt({ ...clone });
-          setTranslateErr(null);
         }
       } catch (e) {
-        if (!cancelled && !translatedIt) {
-          console.warn("Translation failed (showing EN):", (e as Error).message);
-        }
+        console.error("Translation failed:", (e as Error).message);
+        // Small delay before showing the banner: a genuine failure stays
+        // visible, but this avoids a jarring flash if the effect re-runs
+        // (e.g. React strict-mode double-invoke) and succeeds right after.
+        errorTimer = setTimeout(() => {
+          if (!cancelled) {
+            setTranslateErr(
+              lang === "it"
+                ? "Traduzione non riuscita: alcuni testi potrebbero apparire in inglese."
+                : "Translation failed: some text may appear in English."
+            );
+          }
+        }, 400);
       } finally {
         if (!cancelled) setTranslating(false);
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      if (errorTimer) clearTimeout(errorTimer);
+    };
   }, [lang, original, translatedIt, translateFn]);
 
   if (!original) return null;
@@ -263,7 +278,7 @@ function ReportPage() {
 
   /* ── Render ────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen" style={{ background: "#faf9f5" }}>
+    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
       <Sidebar
         page="report"
         validation={data.validation ?? null}
@@ -288,8 +303,8 @@ function ReportPage() {
       >
         {/* Slim top bar */}
         <header
-          className="sticky top-0 z-20 bg-white no-print"
-          style={{ height: 48, borderBottom: "1px solid var(--border-color)" }}
+          className="sticky top-0 z-20 no-print"
+          style={{ height: 48, background: "var(--surface)", borderBottom: "1px solid var(--border-color)" }}
         >
           <div className="h-full max-w-5xl mx-auto px-4 flex items-center gap-2 pl-14 md:pl-4">
             <img src={logo} alt="" className="h-5 w-5 rounded" />
@@ -301,7 +316,10 @@ function ReportPage() {
 
         {/* Translation overlay */}
         {translating && (
-          <div className="fixed inset-0 z-30 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center no-print">
+          <div
+            className="fixed inset-0 z-30 backdrop-blur-sm flex flex-col items-center justify-center no-print"
+            style={{ background: "color-mix(in srgb, var(--surface) 85%, transparent)" }}
+          >
             <Loader2 className="h-10 w-10 animate-spin" style={{ color: "var(--accent-primary)" }} />
             <p className="mt-4 font-medium text-sm" style={{ color: "var(--neutral-dark)" }}>
               {lang === "it" ? "Traduzione in corso..." : "Translating..."}
@@ -313,7 +331,11 @@ function ReportPage() {
           <div className="max-w-5xl mx-auto px-4 pt-3 no-print">
             <div
               className="rounded-md text-sm px-4 py-2"
-              style={{ background: "#fde8e2", color: "#a83219", border: "1px solid #f5c6bb" }}
+              style={{
+                background: "color-mix(in srgb, var(--destructive) 12%, var(--surface))",
+                color: "var(--destructive)",
+                border: "1px solid color-mix(in srgb, var(--destructive) 35%, var(--surface))",
+              }}
             >
               {lang === "it" ? "Traduzione non riuscita: " : "Translation failed: "}
               {translateErr}
@@ -334,8 +356,8 @@ function ReportPage() {
 
             <section
               id="visual-analysis"
-              className="rounded-md bg-white p-6"
-              style={{ border: "1px solid var(--border-color)", scrollMarginTop: 64 }}
+              className="rounded-md p-6"
+              style={{ background: "var(--surface)", border: "1px solid var(--border-color)", scrollMarginTop: 64 }}
             >
               <div
                 className="text-[10px] font-bold uppercase tracking-[0.12em] mb-4"
