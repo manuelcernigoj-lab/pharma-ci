@@ -4,9 +4,10 @@ import {
   PanelLeftClose, PanelLeftOpen, Home, Info, FileText,
   Menu, X, LayoutList, BarChart3, FlaskConical, Check, AlertTriangle,
   Calendar, Building2, Target, BookOpen, ShieldCheck,
-  Loader2, Plus, Download, Globe,
+  Loader2, Plus, Download, Globe, Monitor, Sun, Moon,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { useTheme, type ThemeMode } from "@/lib/theme";
 import logo from "@/assets/logo.png";
 
 export type SidebarPage = "home" | "report";
@@ -39,6 +40,7 @@ const SECTIONS = [
 export function Sidebar(props: SidebarProps) {
   const { page } = props;
   const { lang, setLang } = useI18n();
+  const { mode: themeMode, setMode: setThemeMode } = useTheme();
   const navigate = useNavigate();
   const [collapsed,    setCollapsed]   = useState(false);
   const [mobileOpen,   setMobileOpen]  = useState(false);
@@ -82,6 +84,8 @@ export function Sidebar(props: SidebarProps) {
     onNavigate: scrollTo,
     lang,
     setLang,
+    themeMode,
+    setThemeMode,
   };
 
   return (
@@ -99,9 +103,10 @@ export function Sidebar(props: SidebarProps) {
 
       {/* Desktop sidebar */}
       <aside
-        className="hidden md:flex fixed left-0 top-0 h-screen flex-col z-30 transition-[width] duration-300 ease-out overflow-y-auto bg-white"
+        className="hidden md:flex fixed left-0 top-0 h-screen flex-col z-30 transition-[width] duration-300 ease-out overflow-y-auto"
         style={{
           width: collapsed ? 56 : 224,
+          background: "var(--surface)",
           borderRight: "1px solid var(--border-color)",
           scrollbarGutter: "stable",
         }}
@@ -119,8 +124,8 @@ export function Sidebar(props: SidebarProps) {
         <div className="md:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/20" onClick={() => setMobileOpen(false)} />
           <aside
-            className="absolute left-0 top-0 h-full w-[260px] bg-white flex flex-col"
-            style={{ borderRight: "1px solid var(--border-color)", boxShadow: "4px 0 20px rgba(0,0,0,0.08)" }}
+            className="absolute left-0 top-0 h-full w-[260px] flex flex-col"
+            style={{ background: "var(--surface)", borderRight: "1px solid var(--border-color)", boxShadow: "4px 0 20px rgba(0,0,0,0.08)" }}
           >
             <div className="flex items-center justify-between px-4 pt-5 pb-3 shrink-0">
               <div className="flex items-center gap-2">
@@ -154,10 +159,12 @@ interface BodyProps extends ReportSidebarProps {
   onNavigate: (id: string) => void;
   lang: "it" | "en";
   setLang: (l: "it" | "en") => void;
+  themeMode: ThemeMode;
+  setThemeMode: (m: ThemeMode) => void;
 }
 
 function SidebarBody({
-  page, collapsed, activeSection, onNavigate, lang, setLang,
+  page, collapsed, activeSection, onNavigate, lang, setLang, themeMode, setThemeMode,
   validation, validationPassed, validating, onRunValidation, onOpenExport,
 }: BodyProps) {
   const T = (en: string, it: string) => (lang === "it" ? it : en);
@@ -222,8 +229,9 @@ function SidebarBody({
         </>
       )}
 
-      {/* Language toggle */}
-      <div className="pb-3 shrink-0">
+      {/* Theme + Language toggles */}
+      <div className="pb-3 shrink-0 space-y-1">
+        <ThemeToggle collapsed={collapsed} mode={themeMode} setMode={setThemeMode} lang={lang} />
         <button
           type="button"
           onClick={() => setLang(lang === "it" ? "en" : "it")}
@@ -264,7 +272,7 @@ function NavItem({
   href?: string;
 }) {
   const base: React.CSSProperties = active
-    ? { background: "#faf9f5", color: "var(--accent-primary)", fontWeight: 600 }
+    ? { background: "var(--bg)", color: "var(--accent-primary)", fontWeight: 600 }
     : { color: "var(--neutral-mid)" };
 
   const cls = `flex items-center gap-2.5 mx-2 my-px rounded text-[13px] transition-colors cursor-pointer
@@ -306,11 +314,11 @@ function ActionButton({
 }) {
   let style: React.CSSProperties;
   if (tone === "primary") {
-    style = { background: "var(--accent-primary)", color: "#ffffff", border: "none" };
+    style = { background: "var(--accent-primary)", color: "var(--primary-foreground)", border: "none" };
   } else if (tone === "muted-ok") {
-    style = { background: "#e8f5ee", color: "#2d7a4f", border: "1px solid #b8dfc5" };
+    style = { background: "var(--success-bg)", color: "var(--success-fg)", border: "1px solid var(--success-border)" };
   } else {
-    style = { background: "#fef3e2", color: "#8a5e0a", border: "1px solid #f0d090" };
+    style = { background: "var(--warning-bg)", color: "var(--warning-fg)", border: "1px solid var(--warning-border)" };
   }
 
   return (
@@ -325,6 +333,67 @@ function ActionButton({
       <Icon size={14} className={iconSpin ? "animate-spin" : ""} />
       {!collapsed && <span className="truncate">{label}</span>}
     </button>
+  );
+}
+
+function ThemeToggle({
+  collapsed, mode, setMode, lang,
+}: {
+  collapsed: boolean;
+  mode: ThemeMode;
+  setMode: (m: ThemeMode) => void;
+  lang: "it" | "en";
+}) {
+  const options: { mode: ThemeMode; Icon: typeof Monitor; label: string }[] = [
+    { mode: "system", Icon: Monitor, label: lang === "it" ? "Sistema" : "System" },
+    { mode: "light",  Icon: Sun,     label: lang === "it" ? "Chiaro"  : "Light"  },
+    { mode: "dark",   Icon: Moon,    label: lang === "it" ? "Scuro"   : "Dark"   },
+  ];
+
+  if (collapsed) {
+    // Single icon reflecting the current mode; click cycles system → light → dark → system.
+    const order: ThemeMode[] = ["system", "light", "dark"];
+    const current = options.find((o) => o.mode === mode)!;
+    return (
+      <button
+        type="button"
+        onClick={() => setMode(order[(order.indexOf(mode) + 1) % order.length])}
+        className="flex items-center justify-center mx-2 my-0.5 rounded py-2.5 w-[calc(100%-16px)]"
+        style={{ color: "var(--neutral-mid)" }}
+        title={current.label}
+        aria-label={current.label}
+      >
+        <current.Icon size={16} />
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center gap-0.5 mx-2 my-0.5 rounded p-0.5 w-[calc(100%-16px)]"
+      style={{ background: "var(--muted)" }}
+      role="radiogroup"
+      aria-label={lang === "it" ? "Tema" : "Theme"}
+    >
+      {options.map(({ mode: m, Icon, label }) => (
+        <button
+          key={m}
+          type="button"
+          role="radio"
+          aria-checked={mode === m}
+          onClick={() => setMode(m)}
+          title={label}
+          className="flex-1 flex items-center justify-center rounded py-1.5 transition-colors"
+          style={
+            mode === m
+              ? { background: "var(--surface)", color: "var(--accent-primary)" }
+              : { color: "var(--neutral-mid)" }
+          }
+        >
+          <Icon size={14} />
+        </button>
+      ))}
+    </div>
   );
 }
 
