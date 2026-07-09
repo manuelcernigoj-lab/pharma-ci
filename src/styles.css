@@ -84,6 +84,20 @@
   --warning-bg:              #fef3e2;
   --warning-fg:              #8a5e0a;
   --warning-border:          #f0d090;
+  --info-bg:                 #e8f0f8;
+  --info-fg:                 #2d5382;
+  --info-border:             #b0c8e8;
+  --danger-bg:                #fde8e2;
+  --danger-fg:                #a83219;
+  --danger-border:            #f5c6bb;
+
+  /* ── Chart-only neutral tones (medium/low severity bars) ─────
+     Distinct from --neutral-dark/--neutral-mid because those are
+     TEXT tokens that flip to light colors in dark mode — reusing
+     them here would make a "medium threat" bar turn near-white,
+     breaking the visual hierarchy vs the accent "high threat" bar. */
+  --chart-neutral-2:          #474747;   /* medium severity */
+  --chart-neutral-3:          #797979;   /* low severity */
 }
 
 /* ── Dark mode ──────────────────────────────────────────────────
@@ -123,6 +137,18 @@
   --warning-bg:                #2e2311;
   --warning-fg:                #e0b25a;
   --warning-border:            #4a3a1a;
+  --info-bg:                   #1a2a3a;
+  --info-fg:                   #7fb0e0;
+  --info-border:               #2d4258;
+  --danger-bg:                 #3a1f16;
+  --danger-fg:                 #e0785a;
+  --danger-border:             #5a3226;
+
+  /* Direction flips vs light mode: against a DARK surface, a
+     LIGHTER grey reads as more prominent, so "medium" (should
+     stand out more than "low") gets the lighter of the two. */
+  --chart-neutral-2:           #9a978f;   /* medium severity */
+  --chart-neutral-3:           #625f59;   /* low severity */
 }
 
 @layer base {

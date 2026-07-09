@@ -6,13 +6,14 @@ import { useI18n } from "@/lib/i18n";
 import { useState } from "react";
 import type { ReportData } from "@/lib/types";
 
-/* ── Palette tokens (matching CSS vars) ─────────────────────── */
-const C_ACCENT   = "#d97757";   // terracotta — primary / high threat / publications
-const C_MED      = "#474747";   // dark grey  — medium threat
-const C_LOW      = "#797979";   // mid grey   — low threat
-const C_DARK     = "#141413";   // near-black — structural
-const C_MID      = "#b0aea5";   // warm grey  — grid, axis
-const C_BG       = "#faf9f5";   // canvas
+/* ── Palette tokens (CSS vars, with hex fallback) ────────────
+   Using var() here — not just at :root — lets bars, axes, and
+   grid lines pick up the .dark overrides automatically. */
+const C_ACCENT = "var(--accent-primary, #d97757)";   // primary / high threat / publications
+const C_MED    = "var(--chart-neutral-2, #474747)";  // medium threat
+const C_LOW    = "var(--chart-neutral-3, #797979)";  // low threat
+const C_DARK   = "var(--neutral-dark, #141413)";     // structural / category labels
+const C_MID    = "var(--neutral-mid, #b0aea5)";       // grid, axis
 
 /* ── TTM assumption constants ───────────────────────────────── */
 const TTM_ASSUMPTIONS = {
@@ -60,8 +61,8 @@ function colorFor(c?: string): string {
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div
-      className="rounded-md bg-white p-4"
-      style={{ border: "1px solid var(--border-color)" }}
+      className="rounded-md p-4"
+      style={{ background: "var(--surface)", border: "1px solid var(--border-color)" }}
     >
       <h3
         className="text-[11px] font-bold uppercase tracking-[0.1em] mb-3"
@@ -88,7 +89,7 @@ function TTMAssumptionsBox({ lang }: { lang: "it" | "en" }) {
     <div
       className="rounded-md p-4 mt-4 text-[12px] leading-relaxed"
       style={{
-        background: "#faf9f5",
+        background: "var(--bg)",
         border: "1px solid var(--border-color)",
       }}
     >
@@ -163,8 +164,16 @@ export function Charts({ data }: { data: ReportData }) {
               <XAxis dataKey="phase" tick={<AxisTick />} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: C_MID, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip
-                cursor={{ fill: "rgba(217,119,87,0.08)" }}
-                contentStyle={{ border: "1px solid var(--border-color)", borderRadius: 4, fontSize: 12 }}
+                cursor={{ fill: "color-mix(in srgb, var(--accent-primary) 8%, transparent)" }}
+                contentStyle={{
+                  background: "var(--surface)",
+                  color: "var(--neutral-dark)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: 4,
+                  fontSize: 12,
+                }}
+                labelStyle={{ color: "var(--neutral-dark)" }}
+                itemStyle={{ color: "var(--neutral-dark)" }}
               />
               <Bar dataKey="trials" fill={C_ACCENT} radius={[3, 3, 0, 0]} maxBarSize={56} />
             </BarChart>
@@ -188,8 +197,16 @@ export function Charts({ data }: { data: ReportData }) {
               />
               <YAxis tick={{ fill: C_MID, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip
-                cursor={{ fill: "rgba(217,119,87,0.08)" }}
-                contentStyle={{ border: "1px solid var(--border-color)", borderRadius: 4, fontSize: 12 }}
+                cursor={{ fill: "color-mix(in srgb, var(--accent-primary) 8%, transparent)" }}
+                contentStyle={{
+                  background: "var(--surface)",
+                  color: "var(--neutral-dark)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: 4,
+                  fontSize: 12,
+                }}
+                labelStyle={{ color: "var(--neutral-dark)" }}
+                itemStyle={{ color: "var(--neutral-dark)" }}
               />
               <Bar dataKey="publications" fill={C_ACCENT} radius={[3, 3, 0, 0]} maxBarSize={40} />
             </BarChart>
@@ -199,8 +216,8 @@ export function Charts({ data }: { data: ReportData }) {
 
       {/* Threat score chart */}
       <div
-        className="rounded-md bg-white p-4"
-        style={{ border: "1px solid var(--border-color)" }}
+        className="rounded-md p-4"
+        style={{ background: "var(--surface)", border: "1px solid var(--border-color)" }}
       >
         <h3
           className="text-[11px] font-bold uppercase tracking-[0.1em] mb-3"
@@ -230,14 +247,22 @@ export function Charts({ data }: { data: ReportData }) {
                 <YAxis
                   type="category"
                   dataKey="drug"
-                  tick={{ fill: "#141413", fontSize: 12, fontWeight: 500 }}
+                  tick={{ fill: C_DARK, fontSize: 12, fontWeight: 500 }}
                   width={140}
                   axisLine={false}
                   tickLine={false}
                 />
                 <Tooltip
-                  cursor={{ fill: "rgba(217,119,87,0.08)" }}
-                  contentStyle={{ border: "1px solid var(--border-color)", borderRadius: 4, fontSize: 12 }}
+                  cursor={{ fill: "color-mix(in srgb, var(--accent-primary) 8%, transparent)" }}
+                  contentStyle={{
+                    background: "var(--surface)",
+                    color: "var(--neutral-dark)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: 4,
+                    fontSize: 12,
+                  }}
+                  labelStyle={{ color: "var(--neutral-dark)" }}
+                  itemStyle={{ color: "var(--neutral-dark)" }}
                 />
                 <Bar dataKey="score" radius={[0, 3, 3, 0]} maxBarSize={28}>
                   {threatData.map((d, i) => (
@@ -252,7 +277,7 @@ export function Charts({ data }: { data: ReportData }) {
           <div
             className="md:w-44 shrink-0 rounded-md p-3 text-[11px] self-start"
             style={{
-              background: "#faf9f5",
+              background: "var(--bg)",
               border: "1px solid var(--border-color)",
               color: "var(--neutral-dark)",
             }}
@@ -286,8 +311,8 @@ export function Charts({ data }: { data: ReportData }) {
 
       {/* Time-to-Market Gantt */}
       <div
-        className="rounded-md bg-white p-4"
-        style={{ border: "1px solid var(--border-color)" }}
+        className="rounded-md p-4"
+        style={{ background: "var(--surface)", border: "1px solid var(--border-color)" }}
       >
         <h3
           className="text-[11px] font-bold uppercase tracking-[0.1em] mb-3"
@@ -320,14 +345,22 @@ export function Charts({ data }: { data: ReportData }) {
                 <YAxis
                   type="category"
                   dataKey="drug"
-                  tick={{ fill: "#141413", fontSize: 12, fontWeight: 500 }}
+                  tick={{ fill: C_DARK, fontSize: 12, fontWeight: 500 }}
                   width={140}
                   axisLine={false}
                   tickLine={false}
                 />
                 <Tooltip
                   formatter={(_v: unknown, _n: unknown, p: { payload?: { label?: string } }) => [p?.payload?.label ?? "—", "Range"]}
-                  contentStyle={{ border: "1px solid var(--border-color)", borderRadius: 4, fontSize: 12 }}
+                  contentStyle={{
+                    background: "var(--surface)",
+                    color: "var(--neutral-dark)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: 4,
+                    fontSize: 12,
+                  }}
+                  labelStyle={{ color: "var(--neutral-dark)" }}
+                  itemStyle={{ color: "var(--neutral-dark)" }}
                 />
                 <Bar dataKey="offset"   stackId="a" fill="transparent" />
                 <Bar dataKey="duration" stackId="a" fill={C_ACCENT} radius={[3, 3, 3, 3]} maxBarSize={28} />
@@ -339,7 +372,7 @@ export function Charts({ data }: { data: ReportData }) {
           <div className="md:w-44 shrink-0 self-start">
             <div
               className="inline-flex rounded-md p-1 gap-1"
-              style={{ background: "#f0ede8" }}
+              style={{ background: "var(--muted)" }}
             >
               {(["fda", "ema", "italy"] as const).map((r) => (
                 <button
@@ -349,7 +382,7 @@ export function Charts({ data }: { data: ReportData }) {
                   className="px-3 py-1 text-[11px] font-semibold rounded transition"
                   style={{
                     background: region === r ? "var(--accent-primary)" : "transparent",
-                    color:      region === r ? "#ffffff" : "var(--neutral-mid)",
+                    color:      region === r ? "var(--primary-foreground)" : "var(--neutral-mid)",
                   }}
                 >
                   {r === "italy" ? "IT" : r.toUpperCase()}

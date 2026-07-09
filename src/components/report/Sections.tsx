@@ -14,24 +14,24 @@ const iconWrap = (Icon: React.ComponentType<{ size?: number; className?: string 
 /* ── Badge helpers ─────────────────────────────────────────── */
 const statusBadge = (status?: string) => {
   const s = (status ?? "").toUpperCase();
-  if (s === "RECRUITING")          return { bg: "#e8f5ee", color: "#2d7a4f" };
-  if (s === "ACTIVE_NOT_RECRUITING") return { bg: "#e8f0f8", color: "#2d5382" };
-  return { bg: "#f0ede8", color: "var(--neutral-mid)" };
+  if (s === "RECRUITING")            return { bg: "var(--success-bg)", color: "var(--success-fg)" };
+  if (s === "ACTIVE_NOT_RECRUITING") return { bg: "var(--info-bg)",    color: "var(--info-fg)" };
+  return { bg: "var(--muted)", color: "var(--neutral-mid)" };
 };
 
 const scoreBadge = (n?: number): React.CSSProperties => {
-  if (n == null) return { background: "#f0ede8", color: "var(--neutral-mid)" };
-  if (n >= 8)   return { background: "#fde8e2", color: "#a83219" };
-  if (n >= 6)   return { background: "#fef3e2", color: "#8a5e0a" };
-  return         { background: "#e8f5ee",   color: "#2d7a4f" };
+  if (n == null) return { background: "var(--muted)", color: "var(--neutral-mid)" };
+  if (n >= 8) return { background: "var(--danger-bg)",  color: "var(--danger-fg)" };
+  if (n >= 6) return { background: "var(--warning-bg)", color: "var(--warning-fg)" };
+  return       { background: "var(--success-bg)", color: "var(--success-fg)" };
 };
 
 const levelBadge = (lvl?: string): React.CSSProperties => {
   const v = (lvl ?? "").toLowerCase();
-  if (v.startsWith("high") || v.startsWith("alt")) return { background: "#e8f5ee", color: "#2d7a4f" };
-  if (v.startsWith("med"))                          return { background: "#fef3e2", color: "#8a5e0a" };
-  if (v.startsWith("low") || v.startsWith("bas"))   return { background: "#fde8e2", color: "#a83219" };
-  return                                              { background: "#f0ede8", color: "var(--neutral-mid)" };
+  if (v.startsWith("high") || v.startsWith("alt")) return { background: "var(--success-bg)", color: "var(--success-fg)" };
+  if (v.startsWith("med"))                          return { background: "var(--warning-bg)", color: "var(--warning-fg)" };
+  if (v.startsWith("low") || v.startsWith("bas"))   return { background: "var(--danger-bg)",  color: "var(--danger-fg)" };
+  return                                              { background: "var(--muted)", color: "var(--neutral-mid)" };
 };
 
 
@@ -60,9 +60,9 @@ function TableWrap({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="overflow-x-auto rounded-md"
-      style={{ border: "1px solid var(--border-color)" }}
+      style={{ border: "1px solid var(--border-color)", background: "var(--surface)" }}
     >
-      <table className="w-full min-w-[700px] bg-white">{children}</table>
+      <table className="w-full min-w-[700px]">{children}</table>
     </div>
   );
 }
@@ -89,7 +89,7 @@ export function PipelineSection({ data }: { data: ReportData }) {
         : (
           <TableWrap>
             <thead>
-              <tr style={{ background: "#faf9f5" }}>
+              <tr style={{ background: "var(--bg)" }}>
                 <Th>{t("th_nct")}</Th><Th>{t("th_title")}</Th><Th>{t("th_phase")}</Th>
                 <Th>{t("th_status")}</Th><Th>{t("th_sponsor")}</Th><Th>{t("th_endpoint")}</Th>
                 <Th>{t("th_completion")}</Th><Th>{t("th_notes")}</Th>
@@ -194,10 +194,10 @@ export function ApprovedSection({ data }: { data: ReportData }) {
 function DrugCard({ drug: d }: { drug: NonNullable<ReportData["approved_drugs"]>[number] }) {
   const isEma = d.agency === "EMA";
 
-  // FDA badge style: blue; EMA badge style: green
+  // FDA badge style: blue (info); EMA badge style: green (success)
   const badgeStyle: React.CSSProperties = isEma
-    ? { background: "#e8f5ee", color: "#2d7a4f", border: "1px solid #b8dfc5" }
-    : { background: "#e8f0f8", color: "#2d5382", border: "1px solid #b0c8e8" };
+    ? { background: "var(--success-bg)", color: "var(--success-fg)", border: "1px solid var(--success-border)" }
+    : { background: "var(--info-bg)",    color: "var(--info-fg)",    border: "1px solid var(--info-border)" };
 
   // For EMA drugs, indication_summary is a list of MeSH terms (e.g. "Arthritis, Rheumatoid; COVID-19")
   // — display as small tags instead of prose
@@ -207,8 +207,8 @@ function DrugCard({ drug: d }: { drug: NonNullable<ReportData["approved_drugs"]>
 
   return (
     <div
-      className="rounded-md p-4 bg-white flex flex-col gap-1.5"
-      style={{ border: "1px solid var(--border-color)" }}
+      className="rounded-md p-4 flex flex-col gap-1.5"
+      style={{ border: "1px solid var(--border-color)", background: "var(--surface)" }}
     >
       {/* Header row: brand name + agency badge */}
       <div className="flex items-start justify-between gap-2">
@@ -251,7 +251,7 @@ function DrugCard({ drug: d }: { drug: NonNullable<ReportData["approved_drugs"]>
             <span
               key={i}
               className="inline-block rounded-full px-2 py-0.5 text-[10px]"
-              style={{ background: "#f0ede8", color: "var(--neutral-mid)" }}
+              style={{ background: "var(--muted)", color: "var(--neutral-mid)" }}
             >
               {ind}
             </span>
@@ -290,7 +290,7 @@ export function ThreatSection({ data }: { data: ReportData }) {
         : (
           <TableWrap>
             <thead>
-              <tr style={{ background: "#faf9f5" }}>
+              <tr style={{ background: "var(--bg)" }}>
                 <Th>{t("th_drug")}</Th><Th>{t("th_sponsor")}</Th><Th>{t("th_phase")}</Th>
                 <Th>{t("th_score")}</Th><Th>{t("th_rationale")}</Th><Th>{t("th_diff")}</Th>
               </tr>
@@ -330,7 +330,7 @@ export function TtmSection({ data }: { data: ReportData }) {
         : (
           <TableWrap>
             <thead>
-              <tr style={{ background: "#faf9f5" }}>
+              <tr style={{ background: "var(--bg)" }}>
                 <Th>{t("th_drug")}</Th><Th>{t("th_sponsor")}</Th><Th>{t("th_phase")}</Th>
                 <Th>{t("th_succ")}</Th><Th>{t("th_fda")}</Th><Th>{t("th_ema")}</Th><Th>{t("th_italy")}</Th>
               </tr>
@@ -373,8 +373,8 @@ export function InnovSection({ data }: { data: ReportData }) {
             {items.map((a, i) => (
               <div
                 key={i}
-                className="rounded-md bg-white p-4"
-                style={{ border: "1px solid var(--border-color)" }}
+                className="rounded-md p-4"
+                style={{ border: "1px solid var(--border-color)", background: "var(--surface)" }}
               >
                 <div className="text-[15px] font-bold mb-3" style={{ color: "var(--neutral-dark)" }}>{a.drug || "—"}</div>
                 <div className="space-y-2 text-sm">
@@ -432,7 +432,7 @@ export function EndpointSection({ data }: { data: ReportData }) {
         : (
           <TableWrap>
             <thead>
-              <tr style={{ background: "#faf9f5" }}>
+              <tr style={{ background: "var(--bg)" }}>
                 <Th>{t("th_drug")}</Th><Th>{t("th_sponsor")}</Th>
                 <Th>{t("th_setting")}</Th>
                 <Th>{t("th_pfs")}</Th><Th>{t("th_os")}</Th><Th>{t("th_orr")}</Th>
@@ -446,7 +446,7 @@ export function EndpointSection({ data }: { data: ReportData }) {
                   <Td>{r.sponsor || "—"}</Td>
                   <Td>
                     {r.therapeutic_setting
-                      ? <Badge style={{ background: "#e8f0f8", color: "#2d5382" }}>{r.therapeutic_setting}</Badge>
+                      ? <Badge style={{ background: "var(--info-bg)", color: "var(--info-fg)" }}>{r.therapeutic_setting}</Badge>
                       : "—"}
                   </Td>
                   <Td>{r.pfs_months ?? "—"}</Td>
@@ -487,8 +487,8 @@ export function PublicationsSection({ data }: { data: ReportData }) {
             {pubs.map((p, i) => (
               <div
                 key={i}
-                className="rounded-md bg-white p-4"
-                style={{ border: "1px solid var(--border-color)" }}
+                className="rounded-md p-4"
+                style={{ border: "1px solid var(--border-color)", background: "var(--surface)" }}
               >
                 <div className="font-semibold text-[14px]" style={{ color: "var(--neutral-dark)" }}>{p.title || "—"}</div>
                 <div className="text-[11px] mt-1" style={{ color: "var(--neutral-mid)" }}>
@@ -508,7 +508,7 @@ export function PublicationsSection({ data }: { data: ReportData }) {
                     href={`https://pubmed.ncbi.nlm.nih.gov/${p.pmid}`}
                     onMouseEnter={(e) => {
                       (e.currentTarget as HTMLAnchorElement).style.background = "var(--accent-primary)";
-                      (e.currentTarget as HTMLAnchorElement).style.color = "#fff";
+                      (e.currentTarget as HTMLAnchorElement).style.color = "var(--primary-foreground)";
                     }}
                     onMouseLeave={(e) => {
                       (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
@@ -557,7 +557,7 @@ export function ValidationSection({
           {validationError && (
             <div
               className="text-sm rounded-md px-3 py-2"
-              style={{ background: "#fde8e2", color: "#a83219", border: "1px solid #f5c6bb" }}
+              style={{ background: "var(--danger-bg)", color: "var(--danger-fg)", border: "1px solid var(--danger-border)" }}
             >
               {validationError}
             </div>
@@ -578,7 +578,7 @@ export function ValidationSection({
             : (
               <TableWrap>
                 <thead>
-                  <tr style={{ background: "#faf9f5" }}>
+                  <tr style={{ background: "var(--bg)" }}>
                     <Th>{t("th_section")}</Th><Th>{t("th_severity")}</Th><Th>{t("th_desc")}</Th>
                   </tr>
                 </thead>

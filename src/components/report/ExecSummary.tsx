@@ -16,8 +16,8 @@ export function ExecSummary({ data }: { data: ReportData }) {
 
   return (
     <section
-      className="rounded-lg bg-white p-8"
-      style={{ border: "1px solid var(--border-color)" }}
+      className="rounded-lg p-8"
+      style={{ background: "var(--surface)", border: "1px solid var(--border-color)" }}
     >
       {/* Label */}
       <div
@@ -42,7 +42,7 @@ export function ExecSummary({ data }: { data: ReportData }) {
             key={m.label}
             className="rounded-md text-center px-4 py-4"
             style={{
-              background: "#faf9f5",
+              background: "var(--bg)",
               border: "1px solid var(--border-color)",
             }}
           >
