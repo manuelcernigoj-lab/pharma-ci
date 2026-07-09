@@ -94,7 +94,7 @@ function IndexPage() {
     return (
       <div
         className="min-h-screen flex flex-col items-center justify-center px-4"
-        style={{ background: "#faf9f5" }}
+        style={{ background: "var(--bg)" }}
       >
         <Loader2
           className="h-10 w-10 animate-spin"
@@ -118,15 +118,15 @@ function IndexPage() {
 
   /* ── Main page ──────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen" style={{ background: "#faf9f5" }}>
+    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
       <Sidebar page="home" />
 
       <div className="md:ml-[var(--sidebar-w,224px)] transition-[margin] duration-300 ease-out">
 
         {/* Top bar */}
         <header
-          className="sticky top-0 z-20 bg-white"
-          style={{ height: 48, borderBottom: "1px solid var(--border-color)" }}
+          className="sticky top-0 z-20"
+          style={{ height: 48, background: "var(--surface)", borderBottom: "1px solid var(--border-color)" }}
         >
           <div className="h-full max-w-4xl mx-auto px-4 flex items-center gap-2 pl-14 md:pl-4">
             <img src={logo} alt="" className="h-5 w-5 rounded" />
@@ -213,8 +213,8 @@ function IndexPage() {
             ].map((s) => (
               <div
                 key={s.n}
-                className="bg-white rounded-md p-6 transition-shadow hover:shadow-sm"
-                style={{ border: "1px solid var(--border-color)" }}
+                className="rounded-md p-6 transition-shadow hover:shadow-sm"
+                style={{ background: "var(--surface)", border: "1px solid var(--border-color)" }}
               >
                 <div
                   className="text-[36px] font-black leading-none mb-3"
@@ -238,10 +238,11 @@ function IndexPage() {
           <form
             onSubmit={onSubmit}
             noValidate
-            className="bg-white rounded-md p-8"
+            className="rounded-md p-8"
             style={{
-              border:     "1px solid var(--border-color)",
-              boxShadow:  "0 2px 16px rgba(0,0,0,0.04)",
+              background:  "var(--surface)",
+              border:      "1px solid var(--border-color)",
+              boxShadow:   "0 2px 16px rgba(0,0,0,0.04)",
             }}
           >
             <div className="space-y-5">
@@ -318,7 +319,7 @@ function IndexPage() {
               </button>
 
               {err && (
-                <p className="text-[12px] text-center" style={{ color: "#a83219" }} role="alert">
+                <p className="text-[12px] text-center" style={{ color: "var(--danger-fg)" }} role="alert">
                   {err}
                 </p>
               )}
@@ -334,22 +335,22 @@ function IndexPage() {
         </footer>
       </div>
 
-      {/* ── Inline styles (no oklch, pure hex) ──────────────────── */}
+      {/* ── Inline styles (CSS vars — adapt to light/dark theme) ── */}
       <style>{`
         .form-input {
           width: 100%;
           border-radius: 4px;
-          border: 1px solid #e2e0db;
-          background: #faf9f5;
+          border: 1px solid var(--border-color);
+          background: var(--bg);
           padding: 10px 14px;
           font-size: 14px;
-          color: #141413;
+          color: var(--neutral-dark);
           transition: border-color 0.15s, box-shadow 0.15s;
           outline: none;
         }
         .form-input:focus {
-          border-color: #d97757;
-          box-shadow: 0 0 0 3px rgba(217,119,87,0.12);
+          border-color: var(--accent-primary);
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 12%, transparent);
         }
         .form-input::-webkit-outer-spin-button,
         .form-input::-webkit-inner-spin-button { -webkit-appearance: none; }
@@ -358,8 +359,8 @@ function IndexPage() {
         .submit-btn {
           height: 48px;
           border-radius: 4px;
-          background: #d97757;
-          color: #ffffff;
+          background: var(--accent-primary);
+          color: var(--primary-foreground);
           font-size: 14px;
           font-weight: 700;
           border: none;
@@ -368,10 +369,10 @@ function IndexPage() {
           letter-spacing: 0.01em;
         }
         .submit-btn:hover {
-          background: #c46843;
-          box-shadow: 0 4px 16px rgba(217,119,87,0.28);
+          background: color-mix(in srgb, var(--accent-primary), black 12%);
+          box-shadow: 0 4px 16px color-mix(in srgb, var(--accent-primary) 28%, transparent);
         }
-        .submit-btn:active { background: #b05a38; }
+        .submit-btn:active { background: color-mix(in srgb, var(--accent-primary), black 20%); }
       `}</style>
     </div>
   );
@@ -384,9 +385,9 @@ function Chip({ children, small }: { children: React.ReactNode; small?: boolean 
       className={`inline-flex items-center rounded-full font-semibold uppercase tracking-[0.07em]
         ${small ? "text-[10px] px-3 py-1" : "text-[10px] px-4 py-1.5"}`}
       style={{
-        background: "#f5ece6",
-        color:      "#d97757",
-        border:     "1px solid #e8c4b0",
+        background: "var(--accent-light)",
+        color:      "var(--accent-primary)",
+        border:     "1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--surface))",
       }}
     >
       {children}
@@ -422,12 +423,12 @@ function Field({
           style={{ color: "var(--neutral-dark)" }}
         >
           {label}
-          {required && <span style={{ color: "#a83219" }} className="ml-0.5">*</span>}
+          {required && <span style={{ color: "var(--danger-fg)" }} className="ml-0.5">*</span>}
         </label>
         {optional && (
           <span
             className="text-[9px] font-bold rounded-full px-2 py-0.5"
-            style={{ background: "#f0ede8", color: "var(--neutral-mid)" }}
+            style={{ background: "var(--muted)", color: "var(--neutral-mid)" }}
           >
             {optional}
           </span>
@@ -436,7 +437,7 @@ function Field({
         {valueBadge && (
           <span
             className="ml-auto text-[10px] font-semibold rounded-full px-2 py-0.5"
-            style={{ background: "#f5ece6", color: "#d97757" }}
+            style={{ background: "var(--accent-light)", color: "var(--accent-primary)" }}
           >
             {valueBadge}
           </span>
@@ -444,7 +445,7 @@ function Field({
       </div>
       {children}
       {error && (
-        <p className="text-[11px] mt-1" style={{ color: "#a83219" }}>{error}</p>
+        <p className="text-[11px] mt-1" style={{ color: "var(--danger-fg)" }}>{error}</p>
       )}
     </div>
   );
