@@ -25,23 +25,23 @@ export function Section({
 
   return (
     <section
-      className="rounded-md bg-white overflow-hidden"
-      style={{ border: "1px solid var(--border-color)" }}
+      className="rounded-md overflow-hidden"
+      style={{ background: "var(--surface)", border: "1px solid var(--border-color)" }}
     >
       {/* Header / trigger */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-3 px-5 py-4 text-left transition-colors"
-        style={{ background: open ? "#faf9f5" : "white" }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#faf9f5"; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = open ? "#faf9f5" : "white"; }}
+        style={{ background: open ? "var(--bg)" : "var(--surface)" }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--bg)"; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = open ? "var(--bg)" : "var(--surface)"; }}
       >
         {/* Status dot */}
         {statusDot && (
           <span
             className="h-2.5 w-2.5 rounded-full shrink-0"
-            style={{ background: statusDot === "ok" ? "#5a9e6f" : "#c8922a" }}
+            style={{ background: statusDot === "ok" ? "var(--success)" : "var(--warning)" }}
           />
         )}
 
@@ -72,7 +72,7 @@ export function Section({
             className="rounded-full text-[11px] font-semibold px-2.5 py-0.5"
             style={{
               background: "var(--accent-primary)",
-              color: "#ffffff",
+              color: "var(--primary-foreground)",
             }}
           >
             {count}
