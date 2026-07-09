@@ -15,6 +15,42 @@ interface ChartItem {
   height:number;
 }
 
+/* ── Force exported charts to always render in the LIGHT palette ──
+   Chart bars/axes/text use var(--token) so they follow the app's
+   live theme on screen — but a cloned SVG serialized to a data URI
+   (thumbnail) or drawn to an off-screen canvas (PNG export) has no
+   access to the page's CSS custom properties, so var() would resolve
+   to nothing there. This walks the clone and bakes in fixed LIGHT
+   hex values, which both fixes that and keeps exported images
+   light-themed even when the app itself is in dark mode. */
+const LIGHT_THEME_MAP: Record<string, string> = {
+  "--accent-primary":  "#d97757",
+  "--chart-neutral-2": "#474747",
+  "--chart-neutral-3": "#797979",
+  "--neutral-dark":    "#141413",
+  "--neutral-mid":     "#b0aea5",
+  "--border-color":    "#e2e0db",
+  "--surface":         "#ffffff",
+  "--bg":              "#faf9f5",
+};
+const VAR_PATTERN = /var\((--[a-z0-9-]+)(?:\s*,\s*[^)]+)?\)/gi;
+
+function forceLightTheme(svg: SVGSVGElement): void {
+  const resolve = (value: string) =>
+    value.replace(VAR_PATTERN, (_m, token: string) => LIGHT_THEME_MAP[token] ?? "#000000");
+
+  const walk = (el: Element) => {
+    for (const attr of ["fill", "stroke", "color"]) {
+      const v = el.getAttribute(attr);
+      if (v && v.includes("var(")) el.setAttribute(attr, resolve(v));
+    }
+    const styleAttr = el.getAttribute("style");
+    if (styleAttr && styleAttr.includes("var(")) el.setAttribute("style", resolve(styleAttr));
+    for (const child of Array.from(el.children)) walk(child);
+  };
+  walk(svg);
+}
+
 export function ExportModal({
   open, onClose, chartsRoot, onDownloadPdf, pdfBusy,
 }: {
@@ -47,6 +83,7 @@ export function ExportModal({
       const clone = svg.cloneNode(true) as SVGSVGElement;
       clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
       if (!clone.getAttribute("viewBox")) clone.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      forceLightTheme(clone);
       const xml   = new XMLSerializer().serializeToString(clone);
       const thumb = `data:image/svg+xml;utf8,${encodeURIComponent(xml)}`;
       return { id: i, title: heading, svg, thumb, width: w, height: h };
@@ -90,8 +127,8 @@ export function ExportModal({
       />
 
       <div
-        className="relative bg-white rounded-md shadow-xl w-[min(600px,92vw)] max-h-[88vh] flex flex-col"
-        style={{ border: "1px solid var(--border-color)" }}
+        className="relative rounded-md shadow-xl w-[min(600px,92vw)] max-h-[88vh] flex flex-col"
+        style={{ background: "var(--surface)", border: "1px solid var(--border-color)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -157,7 +194,7 @@ export function ExportModal({
                 onClick={toggleAll}
                 className="text-[11px] font-semibold px-3 py-1.5 rounded"
                 style={{
-                  background: "#f0ede8",
+                  background: "var(--muted)",
                   color: "var(--neutral-dark)",
                   border: "1px solid var(--border-color)",
                 }}
@@ -170,7 +207,7 @@ export function ExportModal({
                 </span>
                 <div
                   className="inline-flex rounded p-0.5 gap-0.5"
-                  style={{ background: "#f0ede8" }}
+                  style={{ background: "var(--muted)" }}
                 >
                   {(["standard", "high"] as Quality[]).map((q) => (
                     <button
@@ -180,7 +217,7 @@ export function ExportModal({
                       className="text-[10px] font-semibold px-2.5 py-1 rounded transition-colors"
                       style={{
                         background: quality === q ? "var(--accent-primary)" : "transparent",
-                        color:      quality === q ? "#ffffff" : "var(--neutral-mid)",
+                        color:      quality === q ? "var(--primary-foreground)" : "var(--neutral-mid)",
                       }}
                     >
                       {q === "standard" ? "150 ppi" : "300 ppi"}
@@ -208,7 +245,7 @@ export function ExportModal({
                     onClick={() => toggleOne(c.id)}
                     className="relative rounded-md p-3 text-left transition-all"
                     style={{
-                      background: "#faf9f5",
+                      background: "var(--bg)",
                       border: `2px solid ${isSel ? "var(--accent-primary)" : "var(--border-color)"}`,
                     }}
                   >
@@ -216,11 +253,11 @@ export function ExportModal({
                     <div
                       className="absolute top-2 right-2 h-5 w-5 rounded-full flex items-center justify-center"
                       style={{
-                        background: isSel ? "var(--accent-primary)" : "white",
+                        background: isSel ? "var(--accent-primary)" : "var(--surface)",
                         border: `1.5px solid ${isSel ? "var(--accent-primary)" : "var(--border-color)"}`,
                       }}
                     >
-                      {isSel && <Check size={11} color="white" strokeWidth={3} />}
+                      {isSel && <Check size={11} color="var(--primary-foreground)" strokeWidth={3} />}
                     </div>
                     <div
                       className="text-[11px] font-semibold mb-2 pr-7 truncate"
@@ -228,9 +265,12 @@ export function ExportModal({
                     >
                       {c.title}
                     </div>
+                    {/* Thumbnail: intentionally fixed to light (not var(--surface)) — the
+                        chart content itself is forced to the light palette on export
+                        (see forceLightTheme), so the preview should visually match. */}
                     <div
-                      className="rounded bg-white overflow-hidden flex items-center justify-center"
-                      style={{ aspectRatio: "16/10", border: "1px solid var(--border-color)" }}
+                      className="rounded overflow-hidden flex items-center justify-center"
+                      style={{ aspectRatio: "16/10", border: "1px solid var(--border-color)", background: "#ffffff" }}
                     >
                       <img src={c.thumb} alt={c.title} className="max-w-full max-h-full" />
                     </div>
@@ -259,7 +299,7 @@ export function ExportModal({
                 onClick={handleExportCharts}
                 disabled={exporting || selected.size === 0}
                 className="text-[12px] font-semibold px-4 py-2 rounded inline-flex items-center gap-2 disabled:opacity-50"
-                style={{ background: "var(--accent-primary)", color: "#ffffff" }}
+                style={{ background: "var(--accent-primary)", color: "var(--primary-foreground)" }}
               >
                 <Download size={13} />
                 {exporting ? T("Exporting...", "Esportazione...") : T("Export", "Esporta")}
@@ -287,11 +327,11 @@ function ExportCard({
       onClick={onClick}
       disabled={busy}
       className="text-left rounded-md p-4 transition-shadow hover:shadow-sm disabled:opacity-60"
-      style={{ background: "#faf9f5", border: "1px solid var(--border-color)" }}
+      style={{ background: "var(--bg)", border: "1px solid var(--border-color)" }}
     >
       <div
         className="h-9 w-9 rounded flex items-center justify-center mb-3"
-        style={{ background: "var(--accent-primary)" }}
+        style={{ background: "var(--accent-primary)", color: "var(--primary-foreground)" }}
       >
         <Icon size={18} />
       </div>
