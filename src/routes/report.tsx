@@ -337,7 +337,6 @@ function ReportPage() {
                 border: "1px solid color-mix(in srgb, var(--destructive) 35%, var(--surface))",
               }}
             >
-              {lang === "it" ? "Traduzione non riuscita: " : "Translation failed: "}
               {translateErr}
             </div>
           </div>
