@@ -170,7 +170,7 @@ function ReportPage() {
           return;
         }
 
-        const { translations } = await translateFn({ data: { texts, target: "it" } });
+        const { translations, partial } = await translateFn({ data: { texts, target: "it" } });
 
         // Apply using the SAME setters from the same collectTranslatable
         // call — index 0 in setters === index 0 in texts === index 0 in translations.
@@ -181,6 +181,21 @@ function ReportPage() {
         if (!cancelled) {
           // Spread to a new object reference so React always detects the update.
           setTranslatedIt({ ...clone });
+
+          // translateStrings() now falls back per-item instead of throwing,
+          // so a partial failure (e.g. only executive_summary) must be
+          // surfaced here explicitly — the try block otherwise "succeeds".
+          if (partial) {
+            errorTimer = setTimeout(() => {
+              if (!cancelled) {
+                setTranslateErr(
+                  lang === "it"
+                    ? "Traduzione non riuscita: alcuni testi potrebbero apparire in inglese."
+                    : "Translation failed: some text may appear in English."
+                );
+              }
+            }, 400);
+          }
         }
       } catch (e) {
         console.error("Translation failed:", (e as Error).message);

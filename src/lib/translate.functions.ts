@@ -41,6 +41,50 @@ function resolveProvider() {
   throw new Error("No translation API key configured. Set GEMINI_API_KEY or OPENAI_API_KEY.");
 }
 
+/* ── Robust JSON extraction ───────────────────────────────────
+   Models occasionally wrap the JSON in prose ("Here is the
+   translation:" ... or a trailing note) even when explicitly told
+   not to — this happens more often on isolated single-item calls
+   (e.g. the long executive_summary) than on short technical batches,
+   which was silently corrupting exactly that field. Instead of only
+   stripping ```code fences```, find the first {...} block and parse
+   that, ignoring anything before/after it. */
+function extractTranslationsJson(content: string): { translations?: string[] } | null {
+  const stripped = content
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+
+  // Fast path: the whole (stripped) string is valid JSON.
+  try {
+    return JSON.parse(stripped);
+  } catch {
+    // fall through to brace-matching below
+  }
+
+  // Slow path: locate the first balanced {...} block anywhere in the
+  // string and parse just that, tolerating any surrounding prose.
+  const start = stripped.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  for (let i = start; i < stripped.length; i++) {
+    if (stripped[i] === "{") depth++;
+    else if (stripped[i] === "}") {
+      depth--;
+      if (depth === 0) {
+        const candidate = stripped.slice(start, i + 1);
+        try {
+          return JSON.parse(candidate);
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 /* ── Single batch call: translates an array of texts, in order ──
    Throws on any failure (network, non-2xx, invalid JSON) — the
    caller decides whether that should fail the whole request or be
@@ -93,17 +137,9 @@ Do not add markdown, backticks, or any text outside the JSON object.`;
   const json    = await res.json();
   const content = json?.choices?.[0]?.message?.content ?? "{}";
 
-  const cleaned = content
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/```\s*$/i, "")
-    .trim();
-
-  let parsed: { translations?: string[] };
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch {
-    throw new Error(`Translator returned invalid JSON: ${cleaned.slice(0, 100)}`);
+  const parsed = extractTranslationsJson(content);
+  if (!parsed) {
+    throw new Error(`Translator returned invalid JSON: ${String(content).slice(0, 150)}`);
   }
 
   const out = Array.isArray(parsed.translations) ? parsed.translations : [];
@@ -127,19 +163,32 @@ export const translateStrings = createServerFn({ method: "POST" })
     texts.forEach((t, i) => (t.length > LONG_TEXT_THRESHOLD ? longIdx : shortIdx).push(i));
 
     const translations = new Array<string>(texts.length);
+    let anyFailed = false;
 
+    // Guarded with its own fallback: a short-batch failure must not
+    // reject the shared Promise.all and discard already-succeeded long
+    // (e.g. executive_summary) results — each item independently falls
+    // back to its original text on failure.
     const shortPromise = shortIdx.length
-      ? callTranslateApi(provider, shortIdx.map((i) => texts[i]), target)
+      ? callTranslateApi(provider, shortIdx.map((i) => texts[i]), target).catch((e) => {
+          console.error("Translation failed for the short-text batch:", (e as Error).message);
+          anyFailed = true;
+          return shortIdx.map((i) => texts[i]); // fall back to originals, same length/order
+        })
       : Promise.resolve<string[]>([]);
 
-    // Each long text gets its own call AND its own fallback: if it fails,
-    // that single field stays in the source language instead of taking
-    // down the rest of the translation.
+    // Each long text gets its own call, one retry, AND a final fallback:
+    // if both attempts fail, that single field stays in the source
+    // language instead of taking down the rest of the translation. A
+    // retry is worth it here specifically because the isolated call is
+    // the one most prone to a stray preamble breaking JSON parsing.
     const longPromises = longIdx.map((i) =>
       callTranslateApi(provider, [texts[i]], target)
+        .catch(() => callTranslateApi(provider, [texts[i]], target))
         .then((r) => r[0] ?? texts[i])
         .catch((e) => {
           console.error(`Translation failed for a long text (index ${i}):`, (e as Error).message);
+          anyFailed = true;
           return texts[i];
         })
     );
@@ -149,5 +198,5 @@ export const translateStrings = createServerFn({ method: "POST" })
     shortIdx.forEach((origI, k) => { translations[origI] = shortResults[k]; });
     longIdx.forEach((origI, k) => { translations[origI] = longResults[k]; });
 
-    return { translations };
+    return { translations, partial: anyFailed };
   });
