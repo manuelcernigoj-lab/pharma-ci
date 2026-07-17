@@ -16,7 +16,7 @@ function resolveProvider() {
 
   if (geminiApiKey) {
     return {
-      url: "https://generativelanguage.googleapis.com/v1beta/chat/completions",
+      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
       apiKey: geminiApiKey,
       model: "gemini-2.5-flash",
       useResponseFormat: false, // Gemini does NOT support response_format
@@ -85,6 +85,93 @@ function extractTranslationsJson(content: string): { translations?: string[] } |
   return null;
 }
 
+/* ── Plain-text call for a SINGLE long text ──────────────────────
+   Used only for isolated long-text items (e.g. executive_summary).
+   Deliberately skips the JSON envelope entirely: asking a model to
+   translate one long clinical paragraph AND simultaneously keep it
+   valid inside a JSON string (escaping quotes/newlines correctly,
+   matching an exact array shape) is unnecessary complexity that adds
+   failure modes with no benefit for a single string. Plain text has
+   nothing to parse, so a stray preamble or formatting quirk can't
+   corrupt the result the way it can corrupt JSON. */
+async function callTranslatePlainText(
+  provider: ReturnType<typeof resolveProvider>,
+  text: string,
+  target: "it" | "en",
+): Promise<string> {
+  const targetName = target === "it" ? "Italian" : "English";
+  const sys = `You are a professional medical/pharmaceutical translator. \
+Translate the user's text to ${targetName} in full — do not summarize or shorten it. \
+Preserve drug names, gene names, NCT IDs, numbers, dates, percentages, and acronyms exactly as written. \
+Maintain a professional clinical tone. \
+Reply with ONLY the translated text: no quotes around it, no preamble like "Here is the translation", \
+no labels, no markdown, no commentary of any kind — just the translated paragraph itself.`;
+
+  const requestBody: Record<string, unknown> = {
+    model: provider.model,
+    messages: [
+      { role: "system", content: sys },
+      { role: "user", content: text },
+    ],
+    max_tokens: 4096,
+  };
+
+  const res = await fetch(provider.url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${provider.apiKey}`,
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Translation API ${res.status} (plain-text): ${txt.slice(0, 200)}`);
+  }
+
+  const json         = await res.json();
+  const choice        = json?.choices?.[0];
+  const rawContent     = choice?.message?.content;
+  const finishReason   = choice?.finish_reason;
+
+  if (typeof rawContent !== "string" || !rawContent.trim()) {
+    // Rich diagnostic: this is the exact failure mode that was
+    // previously invisible — log finish_reason (e.g. "content_filter"
+    // / "length" / "safety") and the raw response shape so the actual
+    // cause is visible in Cloudflare logs on the next occurrence
+    // instead of being silently swallowed.
+    throw new Error(
+      `Translation API returned empty content (plain-text). finish_reason=${finishReason ?? "unknown"}; ` +
+      `raw response keys=${JSON.stringify(Object.keys(json ?? {}))}`
+    );
+  }
+
+  // Strip a single layer of wrapping quotes if the model added them
+  // despite instructions not to (common, harmless artifact).
+  let out = rawContent.trim();
+  if (
+    (out.startsWith('"') && out.endsWith('"')) ||
+    (out.startsWith("'") && out.endsWith("'"))
+  ) {
+    out = out.slice(1, -1).trim();
+  }
+
+  // Sanity check: a translation drastically shorter than the source
+  // (e.g. the model refused and replied with a one-line apology)
+  // is suspicious enough to treat as a failure rather than silently
+  // accepting a truncated/garbage result.
+  if (out.length < text.length * 0.3) {
+    throw new Error(
+      `Translation API returned suspiciously short content (plain-text): ` +
+      `${out.length} chars vs. ${text.length} source chars. finish_reason=${finishReason ?? "unknown"}. ` +
+      `Content preview: ${out.slice(0, 120)}`
+    );
+  }
+
+  return out;
+}
+
 /* ── Single batch call: translates an array of texts, in order ──
    Throws on any failure (network, non-2xx, invalid JSON) — the
    caller decides whether that should fail the whole request or be
@@ -135,11 +222,15 @@ Do not add markdown, backticks, or any text outside the JSON object.`;
   }
 
   const json    = await res.json();
-  const content = json?.choices?.[0]?.message?.content ?? "{}";
+  const choice  = json?.choices?.[0];
+  const content = choice?.message?.content ?? "{}";
 
   const parsed = extractTranslationsJson(content);
   if (!parsed) {
-    throw new Error(`Translator returned invalid JSON: ${String(content).slice(0, 150)}`);
+    throw new Error(
+      `Translator returned invalid JSON (batch). finish_reason=${choice?.finish_reason ?? "unknown"}; ` +
+      `content preview: ${String(content).slice(0, 150)}`
+    );
   }
 
   const out = Array.isArray(parsed.translations) ? parsed.translations : [];
@@ -177,17 +268,15 @@ export const translateStrings = createServerFn({ method: "POST" })
         })
       : Promise.resolve<string[]>([]);
 
-    // Each long text gets its own call, one retry, AND a final fallback:
-    // if both attempts fail, that single field stays in the source
-    // language instead of taking down the rest of the translation. A
-    // retry is worth it here specifically because the isolated call is
-    // the one most prone to a stray preamble breaking JSON parsing.
+    // Each long text gets its own PLAIN-TEXT call (no JSON envelope —
+    // see callTranslatePlainText), one retry, AND a final fallback: if
+    // both attempts fail, that single field stays in the source
+    // language instead of taking down the rest of the translation.
     const longPromises = longIdx.map((i) =>
-      callTranslateApi(provider, [texts[i]], target)
-        .catch(() => callTranslateApi(provider, [texts[i]], target))
-        .then((r) => r[0] ?? texts[i])
+      callTranslatePlainText(provider, texts[i], target)
+        .catch(() => callTranslatePlainText(provider, texts[i], target))
         .catch((e) => {
-          console.error(`Translation failed for a long text (index ${i}):`, (e as Error).message);
+          console.error(`Translation failed for a long text (index ${i}) after retry:`, (e as Error).message);
           anyFailed = true;
           return texts[i];
         })
